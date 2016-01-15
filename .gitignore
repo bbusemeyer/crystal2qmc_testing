@@ -1,0 +1,5 @@
+*.pyc
+qwalk*
+*checkpoints*
+.ipynb_checkpoints*
+.ipynb_checkpoints

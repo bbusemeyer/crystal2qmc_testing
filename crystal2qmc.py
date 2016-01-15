@@ -327,7 +327,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
 
     for i in range(1,len(pseudo['n_per_j'])):
       if (pseudo['n_per_j'][i-1]==0)and(pseudo['n_per_j'][i]!=0):
-        print("Weird pseudopotential, please generalize write_sys.py.")
+        print("Weird pseudopotential, please generalize write_sys(...).")
         sys.exit("Needs generalization.")
 
     n_per_j = pseudo['n_per_j'][pseudo['n_per_j']>0]
@@ -361,18 +361,120 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
     outf.write("\n".join(outlines))
   return None
 
-def write_jast2():
+# TODO check generality of numbers.
+# TODO generalize atom_type.
+def write_jast2(base="qwalk"):
+  atom_type = "si"
+  outlines = [
+      "jastrow2",
+      "group {",
+      "  optimizebasis",
+      "  eebasis {",
+      "    ee",
+      "    cutoff_cusp",
+      "    gamma 24.0",
+      "    cusp 1.0",
+      "    cutoff 2.96254",
+      "  }",
+      "  eebasis {",
+      "    ee",
+      "    cutoff_cusp",
+      "    gamma 24.0",
+      "    cusp 1.0",
+      "    cutoff 2.96254",
+      "  }",
+      "  twobody_spin {",
+      "    freeze",
+      "    like_coefficients { 0.25 0.0 }",
+      "    unlike_coefficients { 0.0 0.5 }",
+      "  }",
+      "}",
+      "group {",
+      "  optimize_basis",
+      "  eibasis {",
+      "    {0}".format(atom_type),
+      "    polypade",
+      "    beta0 0.2",
+      "    nfunc 3",
+      "    rcut 2.96254",
+      "  }",
+      "  onebody {",
+      "    coefficients {{ {0} 0.0 0.0 0.0}}".format(atom_type),
+      "  }",
+      "  eebasis {",
+      "    ee",
+      "    polypade",
+      "    beta0 0.5",
+      "    nfunc 3",
+      "    rcut 2.96254",
+      "  }",
+      "  twobody {",
+      "    coefficients { 0.0 0.0 0.0 }",
+      "  }",
+      "}"
+    ]
+  with open(base+".jast2",'w') as outf:
+    outf.write("\n".join(outlines))
   return None
 
-# TODO Work for more than one atom.
-def write_basis(basis,base="qwalk"):
+# TODO Test for more than one atom type.
+def write_basis(basis,ions,base="qwalk"):
+  hybridized_check = 0.0
+  hybridized_check += sum(abs(basis['coef_s'] * basis['coef_p']))
+  hybridized_check += sum(abs(basis['coef_p'] * basis['coef_dfg']))
+  hybridized_check += sum(abs(basis['coef_s'] * basis['coef_dfg']))
+  if hybridized_check > 1e-10:
+    print("Hybridized AOs (like sp) not implmemented in write_basis(...)")
+    sys.exit("Not implemented.")
+
+  # If there's no hybridization, at most one of coef_s, coef_p, and coef_dfg is
+  # nonzero. Just add them, so we have one array.
+  done_atoms = {}
+  coefs = basis['coef_s'] + basis['coef_p'] + basis['coef_dfg']
+
+  shell_type = np.tile("Unknown...",basis['shell_type'].shape)
+  typemap = ["S","SP","P","5D","7F_crystal","G","H"]
+  for i in range(5): shell_type[basis['shell_type']==i] = typemap[i]
+
+  cnt = 0
+  aidx = 0
+  atom_type = ions['atom_nums'][aidx]
   outlines = [
       "basis {",
-      "  si",
+      "  {0}".format(periodic_table[atom_type-200-1]),
       "  aospline",
       "  normtype CRYSTAL",
-      "  gamess {",
-      "    "
+      "  gamess {"
+    ]
+  for sidx in range(len(shell_type)):
+    new_aidx = basis['atom_shell'][sidx]-1
+
+    new_atom_type = ions['atom_nums'][new_aidx]
+    if aidx != new_aidx:
+      done_atoms[atom_type] = True
+      if new_atom_type in done_atoms.keys(): 
+        continue
+      else:
+        atom_type = new_atom_type
+        aidx = new_aidx
+        outlines += [
+            "basis {",
+            "  {0}".format(periodic_table[atom_type-200-1]),
+            "  aospline",
+            "  normtype CRYSTAL",
+            "  gamess {"
+          ]
+
+    nprim = basis['prim_shell'][sidx]
+    outlines.append("    {0} {1}".format(shell_type[sidx],nprim))
+    for pidx in range(nprim):
+      outlines.append("      {0} {1} {2}".format(
+        pidx+1,
+        basis['prim_gaus'][cnt],
+        coefs[cnt]
+      ))
+      cnt += 1
+  outlines += ["  }","}"]
   with open(base+".basis",'w') as outf:
     outf.write("\n".join(outlines))
   return None
@@ -388,3 +490,5 @@ for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
   write_slater(basis,kidx)
   write_orb(eigsys,basis,ions,kidx)
   write_sys(lat_parm,basis,eigsys,pseudo,kidx)
+  write_basis(basis,ions)
+  write_jast2()
