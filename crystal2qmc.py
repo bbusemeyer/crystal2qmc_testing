@@ -29,7 +29,7 @@ def read_gred():
   nparms = [int(w) for w in gred_words[1:4]]
   cursor = 4
 
-  # These follow naming of cryapi_inp ("inf" -> "info").
+  # These follow naming of cryapi_inp (but "inf" -> "info").
   info = [int(w) for w in gred_words[cursor          :cursor+nparms[0]]]
   itol = [int(w) for w in gred_words[cursor+nparms[0]:cursor+nparms[1]]]
   par  = [int(w) for w in gred_words[cursor+nparms[1]:cursor+nparms[2]]]
@@ -135,7 +135,7 @@ def read_gred():
 
   return info, lat_parm, ions, basis, pseudo
 
-# Reads in kpoints and eigenvectors from KRED.DAT.
+# Reads in kpoints and eigen{values,vectors} from KRED.DAT.
 def read_kred(info,basis):
   eigsys = {}
 
@@ -144,7 +144,7 @@ def read_kred(info,basis):
   cursor = 0
 
   # Number of k-points in each direction.
-  eigsys['nkpts_dir'] = [int(w) for w in kred_words[cursor:cursor+3]]
+  eigsys['nkpts_dir'] = np.array([int(w) for w in kred_words[cursor:cursor+3]])
   cursor += 3
   # Total number of inequivilent k-points.
   nikpts = int(kred_words[cursor])
@@ -185,8 +185,12 @@ def read_kred(info,basis):
   kpt_coords = []
   eigvecs    = []
   for kidx in range(nkpts):
-    #kpt_coords[kidx,:] = np.array([int(w) for w in kred_words[cursor:cursor+3]])
-    new_kpt_coord = np.array([int(w) for w in kred_words[cursor:cursor+3]])
+    try:
+      new_kpt_coord = np.array([float(w) for w in kred_words[cursor:cursor+3]])
+    except IndexError: # End of file.
+      print("ERROR: KRED.DAT seems to have ended prematurely.")
+      print("Didn't find all {0} kpoints.".format(nkpts))
+      exit("IO Error")
     cursor += 3
 
     # If new_kpt_coord is an inequivilent point...
@@ -285,27 +289,19 @@ def normalize_eigvec(eigsys,basis,kidx):
 
   # Duplicate coefficients for complex, and if multiple basis elements are d.
   # This is to align properly with the d-components of eigvecs.
-  if eigsys['ikpt_iscmpx'][kidx]:
-    tmp = [[f,f] for f in dnorms]
-    dnorms = []
-    for l in tmp: dnorms += l
-  tmp = [[f for i in range(sum(basis['shell_type']==3))] for f in dnorms]
+  tmp = [[f for f in dnorms] for i in range(sum(basis['shell_type']==3))]
   dnorms = []
   for l in tmp: dnorms += l
   dnorms = np.array(dnorms)
   # Likewise for f.
-  if eigsys['ikpt_iscmpx'][kidx]:
-    tmp = [[f,f] for f in fnorms]
-    fnorms = []
-    for l in tmp: fnorms += l
-  tmp = [[f for i in range(sum(basis['shell_type']==4))] for f in fnorms]
+  tmp = [[f for f in fnorms] for i in range(sum(basis['shell_type']==4))]
   fnorms = []
   for l in tmp: fnorms += l
   fnorms = np.array(fnorms)
 
   ao_type = []
   for sidx in range(len(basis['shell_type'])):
-    if eigsys['ikpt_iscmpx'][kidx]:
+    if False: #eigsys['ikpt_iscmpx'][kidx]:
       ao_type += \
         [basis['shell_type'][sidx] for ao in range(2*basis['nao_shell'][sidx])]
     else:
@@ -318,12 +314,13 @@ def normalize_eigvec(eigsys,basis,kidx):
     exit("Not implemented.")
 
 
-  eigvec[ao_type==0,:] *= snorm
-  eigvec[ao_type==2,:] *= pnorm
-  eigvec[ao_type==3,:] = ((eigvec[ao_type==3,:].T)*dnorms).T
-  eigvec[ao_type==4,:] = ((eigvec[ao_type==4,:].T)*fnorms).T
+  eigvec[:,ao_type==0] *= snorm
+  eigvec[:,ao_type==2] *= pnorm
+  eigvec[:,ao_type==3] *= dnorms
+  eigvec[:,ao_type==4] *= fnorms
   return None
       
+# This assumes you have called normalize_eigvec first! TODO better coding style?
 def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   outf = open(base + '_' + str(kidx) + ".orb",'w')
   eigvecs = eigsys['eigvecs'][kidx]
@@ -332,7 +329,8 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   for moidx in np.arange(eigvecs.shape[1])+1:
     for atidx in np.unique(basis['atom_shell']):
       for aoidx in np.arange(nao_atom)+1:
-        outf.write(" ".join(map(str,[moidx,aoidx,atidx,coef_cnt]))+"\n")
+        outf.write(" {:5d} {:5d} {:5d} {:5d}\n"\
+            .format(moidx,aoidx,atidx,coef_cnt))
         coef_cnt += 1
   coef_cnt -= 1 # Last increment doesn't count.
   if eigsys['ikpt_iscmpx'][kidx]: ncoefs = eigvecs.size//2
@@ -346,9 +344,9 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   outf.write("COEFFICIENTS\n")
   for cidx in range(coef_cnt):
     if eigsys['ikpt_iscmpx'][kidx]:
-      outf.write("({0},{1}) ".format(eigvecs_flat[2*cidx],eigvecs_flat[2*cidx+1]))
+      outf.write("({:< 12.8e},{:< 12.8e}) ".format(eigvecs_flat[2*cidx],eigvecs_flat[2*cidx+1]))
     else:
-      outf.write("{0} ".format(eigvecs_flat[cidx]))
+      outf.write("{:< 12.8e} ".format(eigvecs_flat[cidx]))
     print_cnt += 1
     if print_cnt % 5 == 0: outf.write("\n")
   outf.close()
@@ -375,19 +373,21 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
       "  latticevec {",
     ]
   for i in range(3):
-    outlines.append("    " + " ".join(map(str,lat_parm['prim_cell'][i])))
+    outlines.append("    " + "{:< 15} {:< 15} {:< 15}".format(*lat_parm['prim_cell'][i]))
   outlines += [
       "  }",
       "  origin { 0 0 0 }",
       "  cutoff_divider {0}".format(cutoff_divider),
-      "  kpoint {{ {0} }}".format(" ".join(map(str,eigsys['kpt_coords'][kidx])))
+      "  kpoint {{ {:4}   {:4}   {:4} }}".format(
+          *(eigsys['kpt_coords'][kidx]/eigsys['nkpts_dir']*2.)
+        )
     ]
   for aidx in range(len(ions['positions'])):
     outlines.append(
       "  atom {{ {0} {1} coor {2} }}".format(
         periodic_table[ions['atom_nums'][aidx]-200-1], # Assumes ECP.
         ions['charges'][aidx],
-        " ".join(map(str,ions['positions'][aidx]))
+        "{:< 15} {:< 15} {:< 15}".format(*ions['positions'][aidx])
       )
     )
   outlines.append("}")
@@ -398,7 +398,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
 
     for i in range(1,len(pseudo['n_per_j'])):
       if (pseudo['n_per_j'][i-1]==0)and(pseudo['n_per_j'][i]!=0):
-        print("Weird pseudopotential, please generalize write_sys(...).")
+        print("ERROR: Weird pseudopotential, please generalize write_sys(...).")
         sys.exit("Not implemented.")
 
     n_per_j = pseudo['n_per_j'][pseudo['n_per_j']>0]
@@ -408,24 +408,25 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
     r_exps      = pseudo['r_exps'][order]
     if numL > 2: aip = 12
     else:        aip =  6
+    npjline = n_per_j[1:].tolist()+[n_per_j[0]]
     outlines += [
         "pseudo {",
-        "  {0}".format(atom_name),
-        "  aip {0}".format(aip),
-        "  basis {{ {0}".format(atom_name),
+        "  {}".format(atom_name),
+        "  aip {:d}".format(aip),
+        "  basis {{ {}".format(atom_name),
         "    rgaussian",
         "    oldqmc {",
-        "      0.0 {0}".format(numL),
-        "      "+" ".join(map(str,n_per_j[1:]))+" "+str(n_per_j[0])
+        "      0.0 {:d}".format(numL),
+        "      "+"{} {} {}".format(*npjline)
       ]
     cnt = 0
     for jidx,j in enumerate(n_per_j):
       for eidx in range(j):
-        outlines.append("      " + " ".join(map(str,[
+        outlines.append("      " + "{:d}   {:<12} {:< 12}".format(
           r_exps[cnt]+2,
-          exponents[cnt],
-          prefactors[cnt]
-        ])))
+          float(exponents[cnt]),
+          float(prefactors[cnt])
+        ))
         cnt += 1
     outlines += ["    }","  }","}"]
   with open(kbase+".sys",'w') as outf:
