@@ -1,4 +1,4 @@
-method{ VMC nblock 1000 }
+method{ VMC nblock 200 }
 include qwalk_12.sys
 trialfunc{ slater-jastrow
   wf1{ include qwalk_12.slater }

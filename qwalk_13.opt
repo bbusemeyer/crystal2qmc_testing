@@ -1,0 +1,6 @@
+method{ optimize }
+include qwalk_13.sys
+trialfunc{ slater-jastrow
+wf1{ include qwalk_13.slater }
+wf2{ include qwalk.jast2  }
+}
