@@ -237,14 +237,16 @@ def find_basis_cutoff(lat_parm):
 
 # TODO generalize to ferro.
 # TODO generalize to spin-polarized.
-def write_slater(basis,kidx,base="qwalk"):
+def write_slater(basis,eigsys,kidx,base="qwalk"):
   kbase = base + '_' + str(kidx)
   nmo = sum(basis['charges']) / 2
   if nmo % 1 > 1e-10: print("Error: number of electrons is probably noninteger")
   nmo = int(round(nmo))
+  if eigsys['ikpt_iscmpx'][kidx]: orbstr = "CORBITALS"
+  else:                           orbstr = "ORBITALS"
   outlines = [
       "SLATER",
-      "ORBITALS {",
+      "{0} {{".format(orbstr),
       "CUTOFF_MO",
       "  MAGNIFY 1",
       "  NMO {0}".format(nmo),
@@ -344,7 +346,7 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   outf.write("COEFFICIENTS\n")
   for cidx in range(coef_cnt):
     if eigsys['ikpt_iscmpx'][kidx]:
-      outf.write("({:< 12.8e},{:< 12.8e}) ".format(eigvecs_flat[2*cidx],eigvecs_flat[2*cidx+1]))
+      outf.write("({:<12.8e},{:<12.8e}) ".format(eigvecs_flat[2*cidx],eigvecs_flat[2*cidx+1]))
     else:
       outf.write("{:< 12.8e} ".format(eigvecs_flat[cidx]))
     print_cnt += 1
@@ -357,7 +359,6 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
 # TODO Molecule.
 # TODO Generalize to no pseudopotential.
 # TODO pseudopotential may not yet work with more than one atom type.
-# TODO Don't understand ordering of pseudopotential.
 def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
   min_exp = min(basis['prim_gaus'])
   cutoff_length = (-np.log(1e-8)/min_exp)**.5
@@ -373,7 +374,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
       "  latticevec {",
     ]
   for i in range(3):
-    outlines.append("    " + "{:< 15} {:< 15} {:< 15}".format(*lat_parm['prim_cell'][i]))
+    outlines.append("    {:< 15} {:< 15} {:< 15}".format(*lat_parm['prim_cell'][i]))
   outlines += [
       "  }",
       "  origin { 0 0 0 }",
@@ -417,12 +418,12 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
         "    rgaussian",
         "    oldqmc {",
         "      0.0 {:d}".format(numL),
-        "      "+"{} {} {}".format(*npjline)
+        "      {} {} {}".format(*npjline)
       ]
     cnt = 0
     for jidx,j in enumerate(n_per_j):
       for eidx in range(j):
-        outlines.append("      " + "{:d}   {:<12} {:< 12}".format(
+        outlines.append("      {:d}   {:<12} {:< 12}".format(
           r_exps[cnt]+2,
           float(exponents[cnt]),
           float(prefactors[cnt])
@@ -560,7 +561,7 @@ def write_moanalysis():
 info, lat_parm, ions, basis, pseudo = read_gred()
 eigsys = read_kred(info,basis)
 for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
-  write_slater(basis,kidx)
+  write_slater(basis,eigsys,kidx)
   normalize_eigvec(eigsys,basis,kidx)
   write_orb(eigsys,basis,ions,kidx)
   write_sys(lat_parm,basis,eigsys,pseudo,kidx)
