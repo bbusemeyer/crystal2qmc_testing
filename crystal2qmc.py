@@ -177,7 +177,7 @@ def read_kred(info,basis):
   # Read in eigenvectors at inequivilent kpoints. Can't do all kpoints because we 
   # don't know if non-inequivilent kpoints are real or complex (without symmetry
   # info)
-  nevals_kpt = round(nevals / nikpts)
+  nevals_kpt = int(round(nevals / nikpts))
   nkpts  = np.prod(eigsys['nkpts_dir'])
   nao = sum(basis['nao_shell'])
   ncpnts = nevals_kpt * nao
@@ -218,14 +218,18 @@ def read_kred(info,basis):
 
   return eigsys
 
-# TODO
 def find_basis_cutoff(lat_parm):
   latvec = lat_parm['prim_cell']
   cutoff_divider = 2.000001
   cross01 = np.cross(latvec[0], latvec[1])
   cross12 = np.cross(latvec[1], latvec[2])
   cross02 = np.cross(latvec[0], latvec[2])
-  return 0.5
+
+  heights = [0,0,0]
+  heights[0]=abs(np.dot(latvec[0], cross12)/np.dot(cross12,cross12)**.5)
+  heights[1]=abs(np.dot(latvec[1], cross02)/np.dot(cross02,cross02)**.5)
+  heights[2]=abs(np.dot(latvec[2], cross01)/np.dot(cross01,cross01)**.5)
+  return min(heights)/cutoff_divider
 
 # TODO generalize to ferro.
 # TODO generalize to spin-polarized.
@@ -255,8 +259,71 @@ def write_slater(basis,kidx,base="qwalk"):
   with open(kbase+".slater",'w') as outf:
     outf.write("\n".join(outlines))
   return outlines # Might be confusing.
+
+# f orbital normalizations are from 
+# <http://winter.group.shef.ac.uk/orbitron/AOs/4f/equations.html>
+def normalize_eigvec(eigsys,basis,kidx):
+  eigvec = eigsys['eigvecs'][kidx]
+  snorm = 1./(4.*np.pi)**0.5
+  pnorm = snorm*(3.)**.5
+  dnorms = [
+      .5*(5./(4*np.pi))**.5,
+      (15./(4*np.pi))**.5,
+      (15./(4*np.pi))**.5,
+      .5*(15./(4.*np.pi))**.5,
+      (15./(4*np.pi))**.5
+    ]
+  fnorms = [
+      ( 7./(16.*np.pi))**.5,
+      (21./(32.*np.pi))**.5,
+      (21./(32.*np.pi))**.5,
+      (105./(16.*np.pi))**.5, # xyz
+      (105./(4.*np.pi))**.5,
+      (35./(32.*np.pi))**.5,
+      (35./(32.*np.pi))**.5
+    ]
+
+  # Duplicate coefficients for complex, and if multiple basis elements are d.
+  # This is to align properly with the d-components of eigvecs.
+  if eigsys['ikpt_iscmpx'][kidx]:
+    tmp = [[f,f] for f in dnorms]
+    dnorms = []
+    for l in tmp: dnorms += l
+  tmp = [[f for i in range(sum(basis['shell_type']==3))] for f in dnorms]
+  dnorms = []
+  for l in tmp: dnorms += l
+  dnorms = np.array(dnorms)
+  # Likewise for f.
+  if eigsys['ikpt_iscmpx'][kidx]:
+    tmp = [[f,f] for f in fnorms]
+    fnorms = []
+    for l in tmp: fnorms += l
+  tmp = [[f for i in range(sum(basis['shell_type']==4))] for f in fnorms]
+  fnorms = []
+  for l in tmp: fnorms += l
+  fnorms = np.array(fnorms)
+
+  ao_type = []
+  for sidx in range(len(basis['shell_type'])):
+    if eigsys['ikpt_iscmpx'][kidx]:
+      ao_type += \
+        [basis['shell_type'][sidx] for ao in range(2*basis['nao_shell'][sidx])]
+    else:
+      ao_type += \
+        [basis['shell_type'][sidx] for ao in range(basis['nao_shell'][sidx])]
+  ao_type = np.array(ao_type)
+
+  if any(ao_type==1):
+    print("sp orbtials not implemented in normalize_eigvec(...)")
+    exit("Not implemented.")
+
+
+  eigvec[ao_type==0,:] *= snorm
+  eigvec[ao_type==2,:] *= pnorm
+  eigvec[ao_type==3,:] = ((eigvec[ao_type==3,:].T)*dnorms).T
+  eigvec[ao_type==4,:] = ((eigvec[ao_type==4,:].T)*fnorms).T
+  return None
       
-# TODO normalization.
 def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   outf = open(base + '_' + str(kidx) + ".orb",'w')
   eigvecs = eigsys['eigvecs'][kidx]
@@ -276,7 +343,7 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
     sys.exit("Debug Error")
   eigvecs_flat = eigvecs.flatten()
   print_cnt = 0
-  outf.write("coefficients\n")
+  outf.write("COEFFICIENTS\n")
   for cidx in range(coef_cnt):
     if eigsys['ikpt_iscmpx'][kidx]:
       outf.write("({0},{1}) ".format(eigvecs_flat[2*cidx],eigvecs_flat[2*cidx+1]))
@@ -294,6 +361,10 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
 # TODO pseudopotential may not yet work with more than one atom type.
 # TODO Don't understand ordering of pseudopotential.
 def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
+  min_exp = min(basis['prim_gaus'])
+  cutoff_length = (-np.log(1e-8)/min_exp)**.5
+  basis_cutoff = find_basis_cutoff(lat_parm)
+  cutoff_divider = basis_cutoff*2.0 / cutoff_length
   kbase = base + '_' + str(kidx)
   nmo = sum(basis['charges']) / 2
   if nmo % 1 > 1e-10: print("Error: number of electrons is probably noninteger")
@@ -308,7 +379,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
   outlines += [
       "  }",
       "  origin { 0 0 0 }",
-      "  cutoff_divider {0}".format(find_basis_cutoff(lat_parm)),
+      "  cutoff_divider {0}".format(cutoff_divider),
       "  kpoint {{ {0} }}".format(" ".join(map(str,eigsys['kpt_coords'][kidx])))
     ]
   for aidx in range(len(ions['positions'])):
@@ -328,7 +399,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
     for i in range(1,len(pseudo['n_per_j'])):
       if (pseudo['n_per_j'][i-1]==0)and(pseudo['n_per_j'][i]!=0):
         print("Weird pseudopotential, please generalize write_sys(...).")
-        sys.exit("Needs generalization.")
+        sys.exit("Not implemented.")
 
     n_per_j = pseudo['n_per_j'][pseudo['n_per_j']>0]
     order = list(range(n_per_j[0],sum(n_per_j)))+list(range(n_per_j[0]))
@@ -363,7 +434,8 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
 
 # TODO check generality of numbers.
 # TODO generalize atom_type.
-def write_jast2(base="qwalk"):
+def write_jast2(lat_parm,base="qwalk"):
+  basis_cutoff = find_basis_cutoff(lat_parm)
   atom_type = "si"
   outlines = [
       "jastrow2",
@@ -374,14 +446,14 @@ def write_jast2(base="qwalk"):
       "    cutoff_cusp",
       "    gamma 24.0",
       "    cusp 1.0",
-      "    cutoff 2.96254",
+      "    cutoff {0}".format(basis_cutoff),
       "  }",
       "  eebasis {",
       "    ee",
       "    cutoff_cusp",
       "    gamma 24.0",
       "    cusp 1.0",
-      "    cutoff 2.96254",
+      "    cutoff {0}".format(basis_cutoff),
       "  }",
       "  twobody_spin {",
       "    freeze",
@@ -396,7 +468,7 @@ def write_jast2(base="qwalk"):
       "    polypade",
       "    beta0 0.2",
       "    nfunc 3",
-      "    rcut 2.96254",
+      "    rcut {0}".format(basis_cutoff),
       "  }",
       "  onebody {",
       "    coefficients {{ {0} 0.0 0.0 0.0}}".format(atom_type),
@@ -406,7 +478,7 @@ def write_jast2(base="qwalk"):
       "    polypade",
       "    beta0 0.5",
       "    nfunc 3",
-      "    rcut 2.96254",
+      "    rcut {0}".format(basis_cutoff),
       "  }",
       "  twobody {",
       "    coefficients { 0.0 0.0 0.0 }",
@@ -488,7 +560,8 @@ info, lat_parm, ions, basis, pseudo = read_gred()
 eigsys = read_kred(info,basis)
 for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
   write_slater(basis,kidx)
+  normalize_eigvec(eigsys,basis,kidx)
   write_orb(eigsys,basis,ions,kidx)
   write_sys(lat_parm,basis,eigsys,pseudo,kidx)
   write_basis(basis,ions)
-  write_jast2()
+  write_jast2(lat_parm)
