@@ -10,3 +10,4 @@
 *.opt.*
 fort*
 qsub.in
+*.swp
