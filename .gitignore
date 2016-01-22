@@ -1,5 +1,12 @@
-*.pyc
-qwalk*
+**.pyc
 *checkpoints*
-.ipynb_checkpoints*
 .ipynb_checkpoints
+*.orb
+*.basis
+*.sys
+*.jast2
+*.slater
+*.vmc.*
+*.opt.*
+fort*
+qsub.in

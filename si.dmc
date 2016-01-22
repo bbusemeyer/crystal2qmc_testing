@@ -1,0 +1,6 @@
+method { DMC timestep 0.02 nblock 16 tmoves  } 
+include qw_0.sys
+trialfunc { slater-jastrow
+wf1 { include qwalk_0.slater } 
+wf2 { include opt.jast } 
+}
