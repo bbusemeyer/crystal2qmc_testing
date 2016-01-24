@@ -181,27 +181,35 @@ def read_kred(info,basis):
   nkpts  = np.prod(eigsys['nkpts_dir'])
   nao = sum(basis['nao_shell'])
   ncpnts = nevals_kpt * nao
-  nreads = 0
-  kpt_coords = []
-  eigvecs    = []
+  kpt_coords   = []
+  eigvecs_real = []
+  eigvecs_imag = []
   for kidx in range(nkpts):
     try:
       new_kpt_coord = np.array([float(w) for w in kred_words[cursor:cursor+3]])
     except IndexError: # End of file.
       print("ERROR: KRED.DAT seems to have ended prematurely.")
-      print("Didn't find all {0} kpoints.".format(nkpts))
+      print("Didn't find all {0} kpoints.".format(nikpts))
       exit("IO Error")
     cursor += 3
 
     # If new_kpt_coord is an inequivilent point...
     ikidx = np.prod(new_kpt_coord == ikpt_coords,1) == 1
     if any(ikidx):
-      if eigsys['ikpt_iscmpx'][ikidx]: nreads = 2*ncpnts
-      else:                            nreads = ncpnts
-      eig_k = np.array([float(w) for w in kred_words[cursor:cursor+nreads]])
-      cursor += nreads
-      kpt_coords.append(new_kpt_coord)
-      eigvecs.append(eig_k.reshape(int(round(nreads/nao)),nao))
+      if eigsys['ikpt_iscmpx'][ikidx]: 
+        eig_k = np.array([float(w) for w in kred_words[cursor:cursor+2*ncpnts]])
+        cursor += 2*ncpnts
+        eig_k = eig_k.reshape(ncpnts,2)
+        #print(eig_k[:,0])
+        kpt_coords.append(new_kpt_coord)
+        eigvecs_real.append(eig_k[:,0].reshape(int(round(ncpnts/nao)),nao))
+        eigvecs_imag.append(eig_k[:,1].reshape(int(round(ncpnts/nao)),nao))
+      else:                            
+        eig_k = np.array([float(w) for w in kred_words[cursor:cursor+ncpnts]])
+        cursor += ncpnts
+        kpt_coords.append(new_kpt_coord)
+        eigvecs_real.append(eig_k.reshape(int(round(ncpnts/nao)),nao))
+        eigvecs_imag.append(np.zeros((int(round(ncpnts/nao)),nao))) # Not efficient, but safe.
     else: # ...else, skip.
       skip = True
       while skip:
@@ -214,11 +222,12 @@ def read_kred(info,basis):
           skip = False
           break
 
-  # It's probably true that eigsys['kpt_coords'] == ikpt_coords,
+  # It's probably true that kpt_coords == ikpt_coords,
   # because we only read in inequivilent kpoints. However, ordering might be
-  # different, and the ordering is correct for eigsys['kpt_coords'].
+  # different, and the ordering is correct for kpt_coords.
   eigsys['kpt_coords'] = kpt_coords
-  eigsys['eigvecs'] = eigvecs
+  eigsys['eigvecs_real'] = eigvecs_real
+  eigsys['eigvecs_imag'] = eigvecs_imag
 
   return eigsys
 
@@ -269,7 +278,6 @@ def write_slater(basis,eigsys,kidx,base="qwalk"):
 # f orbital normalizations are from 
 # <http://winter.group.shef.ac.uk/orbitron/AOs/4f/equations.html>
 def normalize_eigvec(eigsys,basis,kidx):
-  eigvec = eigsys['eigvecs'][kidx]
   snorm = 1./(4.*np.pi)**0.5
   pnorm = snorm*(3.)**.5
   dnorms = [
@@ -315,40 +323,41 @@ def normalize_eigvec(eigsys,basis,kidx):
     print("sp orbtials not implemented in normalize_eigvec(...)")
     exit("Not implemented.")
 
-
-  eigvec[:,ao_type==0] *= snorm
-  eigvec[:,ao_type==2] *= pnorm
-  eigvec[:,ao_type==3] *= dnorms
-  eigvec[:,ao_type==4] *= fnorms
+  for part in ['eigvecs_real','eigvecs_imag']:
+    eigsys[part][kidx][:,ao_type==0] *= snorm
+    eigsys[part][kidx][:,ao_type==2] *= pnorm
+    eigsys[part][kidx][:,ao_type==3] *= dnorms
+    eigsys[part][kidx][:,ao_type==4] *= fnorms
   return None
       
 # This assumes you have called normalize_eigvec first! TODO better coding style?
 def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   outf = open(base + '_' + str(kidx) + ".orb",'w')
-  eigvecs = eigsys['eigvecs'][kidx]
+  eigvecs_real = eigsys['eigvecs_real'][kidx]
+  eigvecs_imag = eigsys['eigvecs_imag'][kidx]
   nao_atom = int(sum(basis['nao_shell']) / len(ions['positions']))
   coef_cnt = 1
-  for moidx in np.arange(eigvecs.shape[1])+1:
+  for moidx in np.arange(eigvecs_real.shape[1])+1:
     for atidx in np.unique(basis['atom_shell']):
       for aoidx in np.arange(nao_atom)+1:
         outf.write(" {:5d} {:5d} {:5d} {:5d}\n"\
             .format(moidx,aoidx,atidx,coef_cnt))
         coef_cnt += 1
   coef_cnt -= 1 # Last increment doesn't count.
-  if eigsys['ikpt_iscmpx'][kidx]: ncoefs = eigvecs.size//2
-  else:                           ncoefs = eigvecs.size
-  if coef_cnt != ncoefs:
+  if coef_cnt != eigvecs_real.size:
     print("Error: Number of coefficients not coming out correctly!")
     print("Counted: {0} \nAvailable: {1}".format(coef_cnt,eigvecs.size))
     sys.exit("Debug Error")
-  eigvecs_flat = eigvecs.flatten()
+  eigreal_flat = eigvecs_real.flatten()
+  eigimag_flat = eigvecs_imag.flatten()
   print_cnt = 0
   outf.write("COEFFICIENTS\n")
   for cidx in range(coef_cnt):
     if eigsys['ikpt_iscmpx'][kidx]:
-      outf.write("({:<12.8e},{:<12.8e}) ".format(eigvecs_flat[2*cidx],eigvecs_flat[2*cidx+1]))
+      outf.write("({:<.12e},{:<.12e}) "\
+          .format(eigreal_flat[cidx],eigimag_flat[cidx]))
     else:
-      outf.write("{:< 12.8e} ".format(eigvecs_flat[cidx]))
+      outf.write("{:< 15.12e} ".format(eigreal_flat[cidx]))
     print_cnt += 1
     if print_cnt % 5 == 0: outf.write("\n")
   outf.close()
@@ -558,12 +567,13 @@ def write_moanalysis():
 
 #########################
 # Begin actual execution.
-info, lat_parm, ions, basis, pseudo = read_gred()
-eigsys = read_kred(info,basis)
-for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
-  write_slater(basis,eigsys,kidx)
-  normalize_eigvec(eigsys,basis,kidx)
-  write_orb(eigsys,basis,ions,kidx)
-  write_sys(lat_parm,basis,eigsys,pseudo,kidx)
-  write_basis(basis,ions)
-  write_jast2(lat_parm)
+if __name__ == "__main__":
+  info, lat_parm, ions, basis, pseudo = read_gred()
+  eigsys = read_kred(info,basis)
+  for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
+    write_slater(basis,eigsys,kidx)
+    normalize_eigvec(eigsys,basis,kidx)
+    write_orb(eigsys,basis,ions,kidx)
+    write_sys(lat_parm,basis,eigsys,pseudo,kidx)
+    write_basis(basis,ions)
+    write_jast2(lat_parm)
