@@ -11,3 +11,7 @@
 fort*
 qsub.in
 *.swp
+GRED.DAT
+KRED.DAT
+*.out
+*.o
