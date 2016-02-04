@@ -15,4 +15,7 @@ GRED.DAT
 KRED.DAT
 *.out
 *.o
-ERROR INPUT dffit3.dat record.json
+ERROR*
+INPUT 
+dffit3.dat 
+record.json
