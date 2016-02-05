@@ -1,6 +1,13 @@
 import numpy as np
 import sys
 
+# Number of types of pseudopotentials.
+NPS_TYPES = 6
+
+def error(message,errortype):
+  print(message)
+  exit(errortype)
+
 periodic_table = [
   "h","he","li","be","b","c","n","o","f","ne","na","mg","al","si","p","s","cl","ar",
   "k","ca","sc","ti","v","cr","mn","fe","co","ni","cu","zn","ga","ge","as","se","br",
@@ -11,8 +18,8 @@ periodic_table = [
   "rf","db","sg","bh","hs","mt","ds","rg","cp","uut","uuq","uup","uuh","uus","uuo"
 ]
 
+###############################################################################
 # Reads in the geometry, basis, and pseudopotential from GRED.DAT.
-# TODO pseudopotential may not yet work with more than one atom type.
 def read_gred():
   lat_parm = {}
   ions = {}
@@ -37,7 +44,7 @@ def read_gred():
 
   # Lattice parameters.
   lat_parm['prim_cell'] = \
-      np.array([float(w) for w in gred_words[cursor:cursor+9]]).reshape(3,3)
+      np.array([float(w) for w in gred_words[cursor:cursor+9]]).reshape(3,3).T
   cursor += 9
   prim_trans= np.array([float(w) for w in gred_words[cursor:cursor+9]]).reshape(3,3)
   cursor += 9
@@ -135,6 +142,7 @@ def read_gred():
 
   return info, lat_parm, ions, basis, pseudo
 
+###############################################################################
 # Reads in kpoints and eigen{values,vectors} from KRED.DAT.
 def read_kred(info,basis):
   eigsys = {}
@@ -188,9 +196,8 @@ def read_kred(info,basis):
     try:
       new_kpt_coord = np.array([float(w) for w in kred_words[cursor:cursor+3]])
     except IndexError: # End of file.
-      print("ERROR: KRED.DAT seems to have ended prematurely.")
-      print("Didn't find all {0} kpoints.".format(nikpts))
-      exit("IO Error")
+      error("ERROR: KRED.DAT seems to have ended prematurely.\n" + \
+            "Didn't find all {0} kpoints.".format(nikpts),"IO Error")
     cursor += 3
 
     # If new_kpt_coord is an inequivilent point...
@@ -200,7 +207,6 @@ def read_kred(info,basis):
         eig_k = np.array([float(w) for w in kred_words[cursor:cursor+2*ncpnts]])
         cursor += 2*ncpnts
         eig_k = eig_k.reshape(ncpnts,2)
-        #print(eig_k[:,0])
         kpt_coords.append(new_kpt_coord)
         eigvecs_real.append(eig_k[:,0].reshape(int(round(ncpnts/nao)),nao))
         eigvecs_imag.append(eig_k[:,1].reshape(int(round(ncpnts/nao)),nao))
@@ -231,6 +237,7 @@ def read_kred(info,basis):
 
   return eigsys
 
+###############################################################################
 def find_basis_cutoff(lat_parm):
   latvec = lat_parm['prim_cell']
   cutoff_divider = 2.000001
@@ -244,12 +251,14 @@ def find_basis_cutoff(lat_parm):
   heights[2]=abs(np.dot(latvec[2], cross01)/np.dot(cross01,cross01)**.5)
   return min(heights)/cutoff_divider
 
+###############################################################################
 # TODO generalize to ferro.
 # TODO generalize to spin-polarized.
 def write_slater(basis,eigsys,kidx,base="qwalk"):
   kbase = base + '_' + str(kidx)
   nmo = sum(basis['charges']) / 2
-  if nmo % 1 > 1e-10: print("Error: number of electrons is probably noninteger")
+  if nmo % 1 > 1e-10: 
+    error("Error: number of electrons is probably noninteger","Debug error")
   nmo = int(round(nmo))
   if eigsys['ikpt_iscmpx'][kidx]: orbstr = "CORBITALS"
   else:                           orbstr = "ORBITALS"
@@ -275,6 +284,7 @@ def write_slater(basis,eigsys,kidx,base="qwalk"):
     outf.write("\n".join(outlines))
   return outlines # Might be confusing.
 
+###############################################################################
 # f orbital normalizations are from 
 # <http://winter.group.shef.ac.uk/orbitron/AOs/4f/equations.html>
 def normalize_eigvec(eigsys,basis,kidx):
@@ -320,8 +330,7 @@ def normalize_eigvec(eigsys,basis,kidx):
   ao_type = np.array(ao_type)
 
   if any(ao_type==1):
-    print("sp orbtials not implemented in normalize_eigvec(...)")
-    exit("Not implemented.")
+    error("sp orbtials not implemented in normalize_eigvec(...)","Not implemented")
 
   for part in ['eigvecs_real','eigvecs_imag']:
     eigsys[part][kidx][:,ao_type==0] *= snorm
@@ -330,14 +339,16 @@ def normalize_eigvec(eigsys,basis,kidx):
     eigsys[part][kidx][:,ao_type==4] *= fnorms
   return None
       
+###############################################################################
 # This assumes you have called normalize_eigvec first! TODO better coding style?
 def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   outf = open(base + '_' + str(kidx) + ".orb",'w')
   eigvecs_real = eigsys['eigvecs_real'][kidx]
   eigvecs_imag = eigsys['eigvecs_imag'][kidx]
+  # XXX bug if number of shells differs for each atom.
   nao_atom = int(sum(basis['nao_shell']) / len(ions['positions']))
   coef_cnt = 1
-  for moidx in np.arange(eigvecs_real.shape[1])+1:
+  for moidx in np.arange(eigvecs_real.shape[0])+1:
     for atidx in np.unique(basis['atom_shell']):
       for aoidx in np.arange(nao_atom)+1:
         outf.write(" {:5d} {:5d} {:5d} {:5d}\n"\
@@ -345,9 +356,9 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
         coef_cnt += 1
   coef_cnt -= 1 # Last increment doesn't count.
   if coef_cnt != eigvecs_real.size:
-    print("Error: Number of coefficients not coming out correctly!")
-    print("Counted: {0} \nAvailable: {1}".format(coef_cnt,eigvecs.size))
-    sys.exit("Debug Error")
+    error("Error: Number of coefficients not coming out correctly!\n"+\
+          "Counted: {0} \nAvailable: {1}".format(coef_cnt,eigvecs_real.size),
+          "Debug Error")
   eigreal_flat = eigvecs_real.flatten()
   eigimag_flat = eigvecs_imag.flatten()
   print_cnt = 0
@@ -363,11 +374,11 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   outf.close()
   return None
 
+###############################################################################
 # TODO Generalize to ferro.
 # TODO Generalize to spin-polarized.
 # TODO Molecule.
 # TODO Generalize to no pseudopotential.
-# TODO pseudopotential may not yet work with more than one atom type.
 def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
   min_exp = min(basis['prim_gaus'])
   cutoff_length = (-np.log(1e-8)/min_exp)**.5
@@ -375,7 +386,8 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
   cutoff_divider = basis_cutoff*2.0 / cutoff_length
   kbase = base + '_' + str(kidx)
   nmo = sum(basis['charges']) / 2
-  if nmo % 1 > 1e-10: print("Error: number of electrons is probably noninteger")
+  if nmo % 1 > 1e-10: 
+    error("Error: number of electrons is probably noninteger","Debug error")
   nmo = int(round(nmo))
   outlines = [
       "system { periodic",
@@ -393,6 +405,8 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
         )
     ]
   for aidx in range(len(ions['positions'])):
+    if ions['atom_nums'][aidx]-200-1 < 0:
+      error("All-electron calculations not implemented yet.","Not implemented")
     outlines.append(
       "  atom {{ {0} {1} coor {2} }}".format(
         periodic_table[ions['atom_nums'][aidx]-200-1], # Assumes ECP.
@@ -401,19 +415,26 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
       )
     )
   outlines.append("}")
-  for aidx in np.unique(ions['atom_nums']):
-    atom_name = periodic_table[aidx-200-1]
-    atom_name = periodic_table[aidx-200-1]
-    numL = sum(pseudo['n_per_j']>0)
+  ps_cursor = 0
+  done = []
+  for aidx,eidx in enumerate(ions['atom_nums']):
+    if eidx not in done: done.append(eidx)
+    else:                continue
+    atom_name = periodic_table[eidx-200-1]
+    n_per_j = pseudo['n_per_j'][aidx*NPS_TYPES:(aidx+1)*NPS_TYPES]
+    numL = sum(n_per_j>0)
 
-    for i in range(1,len(pseudo['n_per_j'])):
-      if (pseudo['n_per_j'][i-1]==0)and(pseudo['n_per_j'][i]!=0):
-        print("ERROR: Weird pseudopotential, please generalize write_sys(...).")
-        sys.exit("Not implemented.")
+    for i in range(1,len(n_per_j)):
+      if (n_per_j[i-1]==0)and(n_per_j[i]!=0):
+        error("ERROR: Weird pseudopotential, please generalize write_sys(...).",
+              "Not implemented.")
 
-    n_per_j = pseudo['n_per_j'][pseudo['n_per_j']>0]
-    order = list(range(n_per_j[0],sum(n_per_j)))+list(range(n_per_j[0]))
+    n_per_j = n_per_j[n_per_j>0]
+    order = list(np.arange(n_per_j[0],sum(n_per_j))+ps_cursor) + \
+            list(np.arange(n_per_j[0])+ps_cursor)
+    print(order)
     exponents   = pseudo['exponents'][order]
+    print(exponents)
     prefactors  = pseudo['prefactors'][order]
     r_exps      = pseudo['r_exps'][order]
     if numL > 2: aip = 12
@@ -427,7 +448,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
         "    rgaussian",
         "    oldqmc {",
         "      0.0 {:d}".format(numL),
-        "      {} {} {}".format(*npjline)
+        "      "+' '.join(["{}" for i in range(numL)]).format(*npjline)
       ]
     cnt = 0
     for jidx,j in enumerate(n_per_j):
@@ -439,15 +460,16 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
         ))
         cnt += 1
     outlines += ["    }","  }","}"]
+    ps_cursor += sum(n_per_j)
   with open(kbase+".sys",'w') as outf:
     outf.write("\n".join(outlines))
   return None
 
+###############################################################################
 # TODO check generality of numbers.
-# TODO generalize atom_type.
-def write_jast2(lat_parm,base="qwalk"):
+def write_jast2(lat_parm,ions,base="qwalk"):
   basis_cutoff = find_basis_cutoff(lat_parm)
-  atom_type = "si"
+  atom_types = [periodic_table[eidx-200-1] for eidx in ions['atom_nums']]
   outlines = [
       "jastrow2",
       "group {",
@@ -474,15 +496,25 @@ def write_jast2(lat_parm,base="qwalk"):
       "}",
       "group {",
       "  optimize_basis",
+    ]
+  for atom_type in atom_types:
+    outlines += [
       "  eibasis {",
       "    {0}".format(atom_type),
       "    polypade",
       "    beta0 0.2",
       "    nfunc 3",
       "    rcut {0}".format(basis_cutoff),
-      "  }",
+      "  }"
+    ]
+  outlines += [
       "  onebody {",
+    ]
+  for atom_type in atom_types:
+    outlines += [
       "    coefficients {{ {0} 0.0 0.0 0.0}}".format(atom_type),
+    ]
+  outlines += [
       "  }",
       "  eebasis {",
       "    ee",
@@ -500,15 +532,15 @@ def write_jast2(lat_parm,base="qwalk"):
     outf.write("\n".join(outlines))
   return None
 
-# TODO Test for more than one atom type.
+###############################################################################
 def write_basis(basis,ions,base="qwalk"):
   hybridized_check = 0.0
   hybridized_check += sum(abs(basis['coef_s'] * basis['coef_p']))
   hybridized_check += sum(abs(basis['coef_p'] * basis['coef_dfg']))
   hybridized_check += sum(abs(basis['coef_s'] * basis['coef_dfg']))
   if hybridized_check > 1e-10:
-    print("Hybridized AOs (like sp) not implmemented in write_basis(...)")
-    sys.exit("Not implemented.")
+    error("Hybridized AOs (like sp) not implmemented in write_basis(...)",
+          "Not implemented.")
 
   # If there's no hybridization, at most one of coef_s, coef_p, and coef_dfg is
   # nonzero. Just add them, so we have one array.
@@ -534,8 +566,9 @@ def write_basis(basis,ions,base="qwalk"):
 
     new_atom_type = ions['atom_nums'][new_aidx]
     if aidx != new_aidx:
-      done_atoms[atom_type] = True
-      if new_atom_type in done_atoms.keys(): 
+      outlines += ["  }","}"]
+      if new_atom_type in done_atoms:
+        done_atoms.append(atom_type)
         continue
       else:
         atom_type = new_atom_type
@@ -562,6 +595,7 @@ def write_basis(basis,ions,base="qwalk"):
     outf.write("\n".join(outlines))
   return None
 
+###############################################################################
 def write_moanalysis():
   return None
 
@@ -576,4 +610,4 @@ if __name__ == "__main__":
     write_orb(eigsys,basis,ions,kidx)
     write_sys(lat_parm,basis,eigsys,pseudo,kidx)
     write_basis(basis,ions)
-    write_jast2(lat_parm)
+    write_jast2(lat_parm,ions)
