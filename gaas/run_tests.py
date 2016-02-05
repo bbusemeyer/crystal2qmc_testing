@@ -28,7 +28,7 @@ element_list.append(runqwalk.QWalkRunDMC(
     nn=1,np=8,time="0:10:00",queue="batch")))
 
 default_job=jc.default_job_record("GaAs.cif")
-default_job['dft']['kmesh'] = [8,8,8]
+default_job['dft']['kmesh'] = [2,2,2]
 default_job['dft']['functional']['hybrid'] = 0
 default_job['dft']['tolinteg'] = [6,6,6,6,12]
 default_job['dft']['basis']=[0.2,2,2]
