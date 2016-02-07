@@ -432,9 +432,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
     n_per_j = n_per_j[n_per_j>0]
     order = list(np.arange(n_per_j[0],sum(n_per_j))+ps_cursor) + \
             list(np.arange(n_per_j[0])+ps_cursor)
-    print(order)
     exponents   = pseudo['exponents'][order]
-    print(exponents)
     prefactors  = pseudo['prefactors'][order]
     r_exps      = pseudo['r_exps'][order]
     if numL > 2: aip = 12
