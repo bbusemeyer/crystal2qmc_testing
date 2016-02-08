@@ -21,3 +21,7 @@ dffit3.dat
 record.json
 mo_analysis*
 *enopt*
+crystal2qmc.stdout 
+new.autogen.d12 
+*opt
+test
