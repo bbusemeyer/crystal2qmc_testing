@@ -162,7 +162,7 @@ def read_kred(info,basis):
   eigsys['recip_vecs'] = recip_vecs.reshape(3,3)
   cursor += 9
   # Inequivilent k-point coord in reciprocal basis.
-  ikpt_coords = np.array([float(w) for w in kred_words[cursor:cursor+3*nikpts]])
+  ikpt_coords = np.array([int(w) for w in kred_words[cursor:cursor+3*nikpts]])
   ikpt_coords = ikpt_coords.reshape(nikpts,3)
   cursor += 3*nikpts
   # is complex (0) or not (1), converted to True (if complex) or False
@@ -188,13 +188,13 @@ def read_kred(info,basis):
   nevals_kpt = int(round(nevals / nikpts))
   nkpts  = np.prod(eigsys['nkpts_dir'])
   nao = sum(basis['nao_shell'])
-  ncpnts = nevals_kpt * nao
+  ncpnts = int(nevals_kpt * nao)
   kpt_coords   = []
   eigvecs_real = []
   eigvecs_imag = []
   for kidx in range(nkpts):
     try:
-      new_kpt_coord = np.array([float(w) for w in kred_words[cursor:cursor+3]])
+      new_kpt_coord = np.array([int(w) for w in kred_words[cursor:cursor+3]])
     except IndexError: # End of file.
       error("ERROR: KRED.DAT seems to have ended prematurely.\n" + \
             "Didn't find all {0} kpoints.".format(nikpts),"IO Error")
