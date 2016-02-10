@@ -1,6 +1,0 @@
-method{ VMC nblock 200 }
-include qwalk_22.sys
-trialfunc{ slater-jastrow
-  wf1{ include qwalk_22.slater }
-  wf2{ include qwalk.jast2 }
-}
