@@ -421,7 +421,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kidx,base="qwalk"):
     if eidx not in done: done.append(eidx)
     else:                continue
     atom_name = periodic_table[eidx-200-1]
-    n_per_j = pseudo['n_per_j'][aidx*NPS_TYPES:(aidx+1)*NPS_TYPES]
+    n_per_j = pseudo['n_per_j'][(len(done)-1)*NPS_TYPES:len(done)*NPS_TYPES]
     numL = sum(n_per_j>0)
 
     for i in range(1,len(n_per_j)):

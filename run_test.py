@@ -16,6 +16,7 @@ default_job = jc.default_job_record("si/si.cif")
 default_job['dft']['functional']['hybrid'] = 0
 default_job['dft']['basis']=[0.2,2,2]
 default_job['dft']['tolinteg']=[6,6,6,6,14]
+default_job['dft']['edifftol'] = 6
 default_job['dft']['kmesh']=[4,4,4]
 default_job['dft']['spin_polarized']=False
 default_job['qmc']['vmc']['optimizer'] = None
