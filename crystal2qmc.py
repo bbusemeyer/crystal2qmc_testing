@@ -379,7 +379,7 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
 # TODO Generalize to spin-polarized.
 # TODO Molecule.
 # TODO Generalize to no pseudopotential.
-def write_sys(lat_parm,basis,eigsys,pseudo,kidx,base="qwalk"):
+def write_sys(lat_parm,basis,eigsys,pseudo,ions,kidx,base="qwalk"):
   min_exp = min(basis['prim_gaus'])
   cutoff_length = (-np.log(1e-8)/min_exp)**.5
   basis_cutoff = find_basis_cutoff(lat_parm)
@@ -597,15 +597,18 @@ def write_basis(basis,ions,base="qwalk"):
 def write_moanalysis():
   return None
 
-#########################
+###############################################################################
 # Begin actual execution.
-if __name__ == "__main__":
+def convert_crystal(base="qwalk"):
   info, lat_parm, ions, basis, pseudo = read_gred()
   eigsys = read_kred(info,basis)
   for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
-    write_slater(basis,eigsys,kidx)
+    write_slater(basis,eigsys,kidx,base)
     normalize_eigvec(eigsys,basis,kidx)
-    write_orb(eigsys,basis,ions,kidx)
-    write_sys(lat_parm,basis,eigsys,pseudo,kidx)
-    write_basis(basis,ions)
-    write_jast2(lat_parm,ions)
+    write_orb(eigsys,basis,ions,kidx,base)
+    write_sys(lat_parm,basis,eigsys,pseudo,ions,kidx,base)
+    write_basis(basis,ions,base)
+    write_jast2(lat_parm,ions,base)
+
+if __name__ == "__main__":
+  convert_crystal()
