@@ -1,0 +1,6 @@
+method { VMC nblock 20 }
+include qwalk_23.sys
+trialfunc { slater-jastrow
+wf1 { include qwalk_23.slater } 
+wf2 { include qwalk.jast2 }
+}
