@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 import sys
 
@@ -321,12 +322,8 @@ def normalize_eigvec(eigsys,basis,kidx):
 
   ao_type = []
   for sidx in range(len(basis['shell_type'])):
-    if False: #eigsys['ikpt_iscmpx'][kidx]:
-      ao_type += \
-        [basis['shell_type'][sidx] for ao in range(2*basis['nao_shell'][sidx])]
-    else:
-      ao_type += \
-        [basis['shell_type'][sidx] for ao in range(basis['nao_shell'][sidx])]
+    ao_type += \
+      [basis['shell_type'][sidx] for ao in range(basis['nao_shell'][sidx])]
   ao_type = np.array(ao_type)
 
   if any(ao_type==1):
