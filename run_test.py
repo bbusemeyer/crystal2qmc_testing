@@ -21,7 +21,7 @@ default_job['dft']['kmesh']=[4,4,4]
 default_job['dft']['spin_polarized']=False
 default_job['qmc']['vmc']['optimizer'] = None
 default_job['qmc']['vmc']['nblock'] = 20
-default_job['qmc']['vmc']['target_error'] = 0.02
+default_job['qmc']['vmc']['target_error'] = 0.01
 default_job['qmc']['kpoints']='complex'
 
 ##############################################
