@@ -176,7 +176,8 @@ def read_kred(info,basis):
   eigsys['kpt_weights'] = [float(w) for w in kred_words[cursor:cursor+nikpts]]
   cursor += nikpts
   # Eigenvalues: (how many) = (spin) * (number of basis) * (number of kpoints)
-  nevals = (info[63]+1)*info[6]*nikpts
+  eigsys['nspin'] = info[63]+1
+  nevals = eigsys['nspin']*info[6]*nikpts
   eigsys['eigvals'] = [float(w) for w in kred_words[cursor:cursor+nevals]]
   cursor += nevals
   # Weights of eigenvales--incorperating Fermi energy cutoff.
@@ -186,14 +187,15 @@ def read_kred(info,basis):
   # Read in eigenvectors at inequivilent kpoints. Can't do all kpoints because we 
   # don't know if non-inequivilent kpoints are real or complex (without symmetry
   # info)
-  nevals_kpt = int(round(nevals / nikpts))
+  nevals_kpt = int(round(nevals / nikpts / eigsys['nspin']))
   nkpts  = np.prod(eigsys['nkpts_dir'])
   nao = sum(basis['nao_shell'])
+  print("nevals_kpt,nao",nevals_kpt,nao)
   ncpnts = int(nevals_kpt * nao)
   kpt_coords   = []
   eigvecs_real = []
   eigvecs_imag = []
-  for kidx in range(nkpts):
+  for kidx in range(nkpts*eigsys['nspin']):
     try:
       new_kpt_coord = np.array([int(w) for w in kred_words[cursor:cursor+3]])
     except IndexError: # End of file.
@@ -229,10 +231,11 @@ def read_kred(info,basis):
           skip = False
           break
 
-  # It's probably true that kpt_coords == ikpt_coords,
-  # because we only read in inequivilent kpoints. However, ordering might be
-  # different, and the ordering is correct for kpt_coords.
-  eigsys['kpt_coords'] = kpt_coords
+  # It's probably true that kpt_coords == ikpt_coords, with repitition for spin
+  # up and spin down, because we only read in inequivilent kpoints. However,
+  # ordering might be different, and the ordering is correct for kpt_coords.
+  # If there are bugs, this might be a source.
+  eigsys['kpt_coords']   = ikpt_coords # kpt_coords
   eigsys['eigvecs_real'] = eigvecs_real
   eigsys['eigvecs_imag'] = eigvecs_imag
 
