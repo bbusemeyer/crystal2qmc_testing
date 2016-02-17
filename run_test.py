@@ -1,3 +1,4 @@
+from __future__ import print_function
 from cif2crystal import Cif2Crystal
 from runcrystal import RunCrystal, RunProperties, NewRunProperties
 from runqwalk import Crystal2QWalk, NewCrystal2QWalk,\
@@ -6,6 +7,7 @@ from copy import deepcopy
 import job_control as jc
 import os
 import json
+import check_results
 
 import veritas as ver
 
@@ -57,6 +59,7 @@ element_list[3] = NewCrystal2QWalk()
 
 test_job = deepcopy(default_job)
 test_job['control']['id'] = base+"test"
+test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
 results.append(jc.execute(test_job,element_list))
 
 ##############################################
@@ -80,12 +83,13 @@ element_list = [
         nn=1,np=8,time="20:00:00",queue="batch"))
   ]
 
-default_job['supercell'] = [[2,0,0],[0,2,0],[0,0,2]]
-default_job['dft']['kmesh']=[3,3,3] # ensures one complex.
+cur_job = deepcopy(default_job)
+cur_job['supercell'] = [[2,0,0],[0,2,0],[0,0,2]]
+cur_job['dft']['kmesh']=[3,3,3] # ensures one complex.
 
-ref_job = deepcopy(default_job)
+ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
-#results.append(jc.execute(ref_job,element_list))
+results.append(jc.execute(ref_job,element_list[:3]))
 
 element_list[2] = \
     NewRunProperties(
@@ -93,9 +97,10 @@ element_list[2] = \
         nn=1,np=1,time="20:00:00",queue="batch"))
 element_list[3] = NewCrystal2QWalk()
 
-test_job = deepcopy(default_job)
+test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
-#results.append(jc.execute(test_job,element_list))
+test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
+results.append(jc.execute(test_job,element_list[:3]))
 
 ##############################################
 # GaAs calculation (two different atoms).
@@ -118,10 +123,11 @@ element_list = [
         nn=1,np=8,time="20:00:00",queue="batch"))
   ]
 
-default_job['cif'] = open("gaas/GaAs.cif",'r').read()
-default_job['dft']['kmesh']=[3,3,3]
+cur_job = deepcopy(default_job)
+cur_job['cif'] = open("gaas/GaAs.cif",'r').read()
+cur_job['dft']['kmesh']=[3,3,3]
 
-ref_job = deepcopy(default_job)
+ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
 results.append(jc.execute(ref_job,element_list))
 
@@ -131,10 +137,145 @@ element_list[2] = \
         nn=1,np=1,time="20:00:00",queue="batch"))
 element_list[3] = NewCrystal2QWalk()
 
-test_job = deepcopy(default_job)
+test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
+test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
 results.append(jc.execute(test_job,element_list))
+
+##############################################
+# Fe calculation (Spin enabled).
+base = baseroot + "fe_"
+
+element_list = [
+    Cif2Crystal(),
+    RunCrystal(
+      submitter=ver.LocalVeritasCrystalSubmitter(
+        nn=1,np=8,time="20:00:00",queue="batch")),
+    RunProperties(
+      submitter=ver.LocalVeritasPropertiesSubmitter(
+        nn=1,np=1,time="20:00:00",queue="batch")),
+    Crystal2QWalk(),
+    #QWalkVarianceOptimize(
+    #  submitter=ver.LocalVeritasQwalkSubmitter(
+    #    nn=1,np=8,time="20:00:00",queue="batch")),
+    QWalkRunVMC(
+      submitter=ver.LocalVeritasQwalkSubmitter(
+        nn=1,np=8,time="20:00:00",queue="batch"))
+  ]
+
+cur_job = deepcopy(default_job)
+cur_job['cif'] = open("Fe.cif",'r').read()
+cur_job['dft']['kmesh']=[3,3,3]
+cur_job['dft']['spin_polarized']=True
+cur_job['dft']['initial_spin'] = [1]
+cur_job['total_spin'] = 2
+
+ref_job = deepcopy(cur_job)
+ref_job['control']['id'] = base+"ref"
+results.append(jc.execute(ref_job,element_list))
+
+element_list[2] = \
+    NewRunProperties(
+      submitter=ver.LocalVeritasPropertiesSubmitter(
+        nn=1,np=1,time="20:00:00",queue="batch"))
+element_list[3] = NewCrystal2QWalk()
+
+test_job = deepcopy(cur_job)
+test_job['control']['id'] = base+"test"
+test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
+results.append(jc.execute(test_job,element_list))
+
+###############################################
+## KMnF3 calculation (Spin enabled).
+#base = baseroot + "kmnf3_"
+#
+#element_list = [
+#    Cif2Crystal(),
+#    RunCrystal(
+#      submitter=ver.LocalVeritasCrystalSubmitter(
+#        nn=1,np=8,time="20:00:00",queue="batch")),
+#    RunProperties(
+#      submitter=ver.LocalVeritasPropertiesSubmitter(
+#        nn=1,np=1,time="20:00:00",queue="batch")),
+#    Crystal2QWalk(),
+#    #QWalkVarianceOptimize(
+#    #  submitter=ver.LocalVeritasQwalkSubmitter(
+#    #    nn=1,np=8,time="20:00:00",queue="batch")),
+#    QWalkRunVMC(
+#      submitter=ver.LocalVeritasQwalkSubmitter(
+#        nn=1,np=8,time="20:00:00",queue="batch"))
+#  ]
+#
+#cur_job = deepcopy(default_job)
+#cur_job['cif'] = open("KMnF3.cif",'r').read()
+#cur_job['dft']['kmesh']=[3,3,3]
+#cur_job['dft']['spin_polarized']=True
+#cur_job['dft']['initial_spin'] = [0,1,0,0,0]
+#
+#ref_job = deepcopy(cur_job)
+#ref_job['control']['id'] = base+"ref"
+#results.append(jc.execute(ref_job,element_list))
+#
+#element_list[2] = \
+#    NewRunProperties(
+#      submitter=ver.LocalVeritasPropertiesSubmitter(
+#        nn=1,np=1,time="20:00:00",queue="batch"))
+#element_list[3] = NewCrystal2QWalk()
+#
+#test_job = deepcopy(cur_job)
+#test_job['control']['id'] = base+"test"
+#results.append(jc.execute(test_job,element_list))
+
+##############################################
+# MnO calculation (Antiferromagnetic, expensive).
+base = baseroot + "mno_"
+
+element_list = [
+    Cif2Crystal(),
+    RunCrystal(
+      submitter=ver.LocalVeritasCrystalSubmitter(
+        nn=1,np=8,time="20:00:00",queue="batch")),
+    RunProperties(
+      submitter=ver.LocalVeritasPropertiesSubmitter(
+        nn=1,np=1,time="20:00:00",queue="batch")),
+    Crystal2QWalk(),
+    #QWalkVarianceOptimize(
+    #  submitter=ver.LocalVeritasQwalkSubmitter(
+    #    nn=1,np=8,time="20:00:00",queue="batch")),
+    QWalkRunVMC(
+      submitter=ver.LocalVeritasQwalkSubmitter(
+        nn=1,np=8,time="20:00:00",queue="batch"))
+  ]
+
+cur_job = deepcopy(default_job)
+cur_job['cif'] = open("mno/MnO.cif",'r').read()
+cur_job['supercell'] = [[2,0,0],[0,2,0],[0,0,2]]
+cur_job['dft']['initial_spin'] = [1,1,1,-1,1,-1,-1,-1,0,0,0,0,0,0,0,0]
+cur_job['dft']['kmesh']=[3,3,3]
+cur_job['dft']['spin_polarized']=True
+
+ref_job = deepcopy(cur_job)
+ref_job['control']['id'] = base+"ref"
+#results.append(jc.execute(ref_job,element_list[:3]))
+
+element_list[2] = \
+    NewRunProperties(
+      submitter=ver.LocalVeritasPropertiesSubmitter(
+        nn=1,np=1,time="20:00:00",queue="batch"))
+element_list[3] = NewCrystal2QWalk()
+
+test_job = deepcopy(cur_job)
+test_job['control']['id'] = base+"test"
+test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
+#results.append(jc.execute(test_job,element_list[:3]))
 
 ###############################################
 # Gather and export.
 json.dump(results,open("test_results.json",'w'))
+
+print("~~~~~~~~~~~~~~~~~~~~~~")
+print("Checking results...")
+try:
+  check_results.perform_check("test_results.json")
+except KeyError:
+  print("KeyError occured, maybe no calculations have finished yet?")
