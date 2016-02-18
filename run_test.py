@@ -89,7 +89,7 @@ cur_job['dft']['kmesh']=[3,3,3] # ensures one complex.
 
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
-results.append(jc.execute(ref_job,element_list[:3]))
+#results.append(jc.execute(ref_job,element_list[:3]))
 
 element_list[2] = \
     NewRunProperties(
@@ -100,7 +100,7 @@ element_list[3] = NewCrystal2QWalk()
 test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-results.append(jc.execute(test_job,element_list[:3]))
+#results.append(jc.execute(test_job,element_list[:3]))
 
 ##############################################
 # GaAs calculation (two different atoms).
@@ -279,3 +279,5 @@ try:
   check_results.perform_check("test_results.json")
 except KeyError:
   print("KeyError occured, maybe no calculations have finished yet?")
+except IndexError:
+  print("IndexError occured, maybe only one type of calculation has finished yet?")
