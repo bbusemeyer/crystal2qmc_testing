@@ -243,7 +243,7 @@ def read_kred(info,basis):
 ###############################################################################
 # Reads total spin from output file. 
 # TODO Is there a way around this?
-# Alternatively, this can read the CRYSTAL output file and still work!
+# Alternatively, this can read the CRYSTAL output file and still works!
 def read_outputfile(fname = "prop.in.o"):
   fin = open(fname,'r')
   for line in fin:
@@ -272,10 +272,10 @@ def find_basis_cutoff(lat_parm):
 ###############################################################################
 def write_slater(basis,eigsys,kidx,base="qwalk"):
   kbase = base + '_' + str(kidx)
-  ntot = int(round(sum(basis['charges'])))
-  nmo  = sum(basis['nao_shell']) # = nao
-  nup  = int(round(0.5 * (ntot + eigsys['totspin'])))
-  ndn  = int(round(0.5 * (ntot - eigsys['totspin'])))
+  ntot = basis['ntot']
+  nmo  = basis['nmo']
+  nup  = eigsys['nup']
+  ndn  = eigsys['ndn']
   uporbs = np.arange(nup)+1
   dnorbs = np.arange(ndn)+1
   if eigsys['nspin'] > 1:
@@ -364,14 +364,16 @@ def normalize_eigvec(eigsys,basis,kidx):
       
 ###############################################################################
 # This assumes you have called normalize_eigvec first! TODO better coding style?
+# TODO: see "bug" below.
 def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   outf = open(base + '_' + str(kidx) + ".orb",'w')
   eigvecs_real = eigsys['eigvecs_real'][kidx]
   eigvecs_imag = eigsys['eigvecs_imag'][kidx]
   # XXX bug if number of shells differs for each atom.
-  nao_atom = int(sum(basis['nao_shell']) / len(ions['positions']))
+  nao_atom = int(round(sum(basis['nao_shell']) / len(ions['positions'])))
   coef_cnt = 1
-  for moidx in np.arange(eigvecs_real.shape[0])+1:
+  totnmo = basis['nmo'] * eigsys['nspin']
+  for moidx in np.arange(totnmo)+1:
     for atidx in np.unique(basis['atom_shell']):
       for aoidx in np.arange(nao_atom)+1:
         outf.write(" {:5d} {:5d} {:5d} {:5d}\n"\
@@ -398,8 +400,6 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
   return None
 
 ###############################################################################
-# TODO Generalize to ferro.
-# TODO Generalize to spin-polarized.
 # TODO Molecule.
 # TODO Generalize to no pseudopotential.
 def write_sys(lat_parm,basis,eigsys,pseudo,ions,kidx,base="qwalk"):
@@ -408,13 +408,9 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kidx,base="qwalk"):
   basis_cutoff = find_basis_cutoff(lat_parm)
   cutoff_divider = basis_cutoff*2.0 / cutoff_length
   kbase = base + '_' + str(kidx)
-  nmo = sum(basis['charges']) / 2
-  if nmo % 1 > 1e-10: 
-    error("Error: number of electrons is probably noninteger","Debug error")
-  nmo = int(round(nmo))
   outlines = [
       "system { periodic",
-      "  nspin {{ {0} {1} }}".format(nmo,nmo),
+      "  nspin {{ {} {} }}".format(eigsys['nup'],eigsys['ndn']),
       "  latticevec {",
     ]
   for i in range(3):
@@ -625,10 +621,18 @@ def write_moanalysis():
 def convert_crystal(base="qwalk"):
   info, lat_parm, ions, basis, pseudo = read_gred()
   eigsys = read_kred(info,basis)
+
   if eigsys['nspin'] > 1:
     eigsys['totspin'] = read_outputfile("prop.in.o")
   else:
     eigsys['totspin'] = 0
+
+  # Useful quantities.
+  basis['ntot'] = int(round(sum(basis['charges'])))
+  basis['nmo']  = sum(basis['nao_shell']) # = nao
+  eigsys['nup'] = int(round(0.5 * (basis['ntot'] + eigsys['totspin'])))
+  eigsys['ndn'] = int(round(0.5 * (basis['ntot'] - eigsys['totspin'])))
+  
   for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
     write_slater(basis,eigsys,kidx,base)
     normalize_eigvec(eigsys,basis,kidx)
