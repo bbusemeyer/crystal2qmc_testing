@@ -242,6 +242,21 @@ def read_kred(info,basis):
   return eigsys
 
 ###############################################################################
+# Reads total spin from output file. 
+# TODO Is there a way around this?
+# Alternatively, this can read the CRYSTAL output file and still work!
+def read_outputfile(fname = "prop.in.o"):
+  fin = open(fname,'r')
+  for line in fin:
+    if "SUMMED SPIN DENSITY" in line:
+      spin = float(line.split()[-1])
+  if abs(round(spin) - spin) > 1e-8:
+    print("Warning: spin %f is not close to integer!"%spin)
+    print("  I'm rounding this to %d."%int(round(spin)))
+  spin = int(round(spin))
+  return spin
+
+###############################################################################
 def find_basis_cutoff(lat_parm):
   latvec = lat_parm['prim_cell']
   cutoff_divider = 2.000001
@@ -602,6 +617,8 @@ def write_moanalysis():
 def convert_crystal(base="qwalk"):
   info, lat_parm, ions, basis, pseudo = read_gred()
   eigsys = read_kred(info,basis)
+  if eigsys['nspin'] < 1:
+    eigsys['totspin'] = read_outputfile("prop.in.o")
   for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
     write_slater(basis,eigsys,kidx,base)
     normalize_eigvec(eigsys,basis,kidx)
