@@ -190,7 +190,6 @@ def read_kred(info,basis):
   nevals_kpt = int(round(nevals / nikpts / eigsys['nspin']))
   nkpts  = np.prod(eigsys['nkpts_dir'])
   nao = sum(basis['nao_shell'])
-  print("nevals_kpt,nao",nevals_kpt,nao)
   ncpnts = int(nevals_kpt * nao)
   kpt_coords   = []
   eigvecs_real = []
@@ -271,22 +270,31 @@ def find_basis_cutoff(lat_parm):
   return min(heights)/cutoff_divider
 
 ###############################################################################
-# TODO generalize to ferro.
-# TODO generalize to spin-polarized.
 def write_slater(basis,eigsys,kidx,base="qwalk"):
   kbase = base + '_' + str(kidx)
-  nmo = sum(basis['charges']) / 2
-  if nmo % 1 > 1e-10: 
-    error("Error: number of electrons is probably noninteger","Debug error")
-  nmo = int(round(nmo))
+  ntot = int(round(sum(basis['charges'])))
+  nmo  = sum(basis['nao_shell']) # = nao
+  nup  = int(round(0.5 * (ntot + eigsys['totspin'])))
+  ndn  = int(round(0.5 * (ntot - eigsys['totspin'])))
+  uporbs = np.arange(nup)+1
+  dnorbs = np.arange(ndn)+1
+  if eigsys['nspin'] > 1:
+    dnorbs += nmo
   if eigsys['ikpt_iscmpx'][kidx]: orbstr = "CORBITALS"
   else:                           orbstr = "ORBITALS"
+  uporblines = ["{:5d}".format(orb) for orb in uporbs]
+  width = 10
+  for i in reversed(range(width,len(uporblines),width)):
+    uporblines.insert(i,"\n ")
+  dnorblines = ["{:5d}".format(orb) for orb in dnorbs]
+  for i in reversed(range(width,len(dnorblines),width)):
+    dnorblines.insert(i,"\n ")
   outlines = [
       "SLATER",
       "{0} {{".format(orbstr),
       "CUTOFF_MO",
       "  MAGNIFY 1",
-      "  NMO {0}".format(nmo),
+      "  NMO {0}".format(dnorbs[-1]),
       "  ORBFILE {0}.orb".format(kbase),
       "  INCLUDE {0}.basis".format(base),
       "  CENTERS { USEGLOBAL }",
@@ -294,9 +302,9 @@ def write_slater(basis,eigsys,kidx,base="qwalk"):
       "DETWT { 1.0 }",
       "STATES {",
       "  # Spin up orbitals.", 
-      "  " + " ".join([str(i+1) for i in range(nmo)]),
+      "  " + " ".join(uporblines),
       "  # Spin down orbitals.",
-      "  " + " ".join([str(i+1) for i in range(nmo)]),
+      "  " + " ".join(dnorblines),
       "}"
     ]
   with open(kbase+".slater",'w') as outf:
@@ -617,8 +625,10 @@ def write_moanalysis():
 def convert_crystal(base="qwalk"):
   info, lat_parm, ions, basis, pseudo = read_gred()
   eigsys = read_kred(info,basis)
-  if eigsys['nspin'] < 1:
+  if eigsys['nspin'] > 1:
     eigsys['totspin'] = read_outputfile("prop.in.o")
+  else:
+    eigsys['totspin'] = 0
   for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
     write_slater(basis,eigsys,kidx,base)
     normalize_eigvec(eigsys,basis,kidx)
