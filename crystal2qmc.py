@@ -192,32 +192,55 @@ def read_kred(info,basis):
   nao = sum(basis['nao_shell'])
   ncpnts = int(nevals_kpt * nao)
   kpt_coords   = []
-  eigvecs_real = []
-  eigvecs_imag = []
+  # eigvecs[<real/imag>][kpoint][<spin up/spin down>]
+  eigvecs = {}
   for kidx in range(nkpts*eigsys['nspin']):
     try:
-      new_kpt_coord = np.array([int(w) for w in kred_words[cursor:cursor+3]])
+      new_kpt_coord = tuple([int(w) for w in kred_words[cursor:cursor+3]])
     except IndexError: # End of file.
       error("ERROR: KRED.DAT seems to have ended prematurely.\n" + \
             "Didn't find all {0} kpoints.".format(nikpts),"IO Error")
     cursor += 3
 
     # If new_kpt_coord is an inequivilent point...
-    ikidx = np.prod(new_kpt_coord == ikpt_coords,1) == 1
+    ikidx = np.prod(np.array(new_kpt_coord) == ikpt_coords,1) == 1
     if any(ikidx):
-      if eigsys['ikpt_iscmpx'][ikidx]: 
+      # If complex...
+      if eigsys['ikpt_iscmpx'][ikidx]:
         eig_k = np.array([float(w) for w in kred_words[cursor:cursor+2*ncpnts]])
         cursor += 2*ncpnts
         eig_k = eig_k.reshape(ncpnts,2)
         kpt_coords.append(new_kpt_coord)
-        eigvecs_real.append(eig_k[:,0].reshape(int(round(ncpnts/nao)),nao))
-        eigvecs_imag.append(eig_k[:,1].reshape(int(round(ncpnts/nao)),nao))
-      else:                            
+        if new_kpt_coord in eigvecs.keys():
+          eigvecs[new_kpt_coord]['real'].append(
+              eig_k[:,0].reshape(int(round(ncpnts/nao)),nao)
+            )
+          eigvecs[new_kpt_coord]['imag'].append(
+              eig_k[:,1].reshape(int(round(ncpnts/nao)),nao)
+            )
+        else:
+          eigvecs[new_kpt_coord] = {}
+          eigvecs[new_kpt_coord]['real'] = \
+            [eig_k[:,0].reshape(int(round(ncpnts/nao)),nao)]
+          eigvecs[new_kpt_coord]['imag'] = \
+            [eig_k[:,1].reshape(int(round(ncpnts/nao)),nao)]
+      else: # ...else real.
         eig_k = np.array([float(w) for w in kred_words[cursor:cursor+ncpnts]])
         cursor += ncpnts
         kpt_coords.append(new_kpt_coord)
-        eigvecs_real.append(eig_k.reshape(int(round(ncpnts/nao)),nao))
-        eigvecs_imag.append(np.zeros((int(round(ncpnts/nao)),nao))) # Not efficient, but safe.
+        if new_kpt_coord in eigvecs.keys():
+          eigvecs[new_kpt_coord]['real'].append(
+              eig_k.reshape(int(round(ncpnts/nao)),nao)
+            )
+          eigvecs[new_kpt_coord]['imag'].append(
+              np.zeros((int(round(ncpnts/nao)),nao))
+            ) # Not efficient, but safe.
+        else:
+          eigvecs[new_kpt_coord] = {}
+          eigvecs[new_kpt_coord]['real'] = \
+            [eig_k.reshape(int(round(ncpnts/nao)),nao)]
+          eigvecs[new_kpt_coord]['imag'] = \
+            [np.zeros((int(round(ncpnts/nao)),nao))]
     else: # ...else, skip.
       skip = True
       while skip:
@@ -235,8 +258,7 @@ def read_kred(info,basis):
   # ordering might be different, and the ordering is correct for kpt_coords.
   # If there are bugs, this might be a source.
   eigsys['kpt_coords']   = ikpt_coords # kpt_coords
-  eigsys['eigvecs_real'] = eigvecs_real
-  eigsys['eigvecs_imag'] = eigvecs_imag
+  eigsys['eigvecs'] = eigvecs
 
   return eigsys
 
