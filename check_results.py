@@ -24,20 +24,32 @@ def compare_results(df,tol=3.0):
         dtest[key][0] - dres[key][0],
         tol*(dres[key][1]**2 + dtest[key][1]**2)**.5))
   #print "Total count %d."%count
-  return pd.Series([kcheck,allcheck],['kcheck','allcheck'])
+  refegy  = df.loc[df['type']=='ref', 'vmc_energy'].iloc[0]
+  testegy = df.loc[df['type']=='test', 'vmc_energy'].iloc[0]
+  referr  = df.loc[df['type']=='ref', 'vmc_error'].iloc[0]
+  testerr = df.loc[df['type']=='test', 'vmc_error'].iloc[0]
+  avgcheck = testegy-refegy < tol*(testerr**2 + referr**2)**.5
+  return pd.Series([kcheck,allcheck,avgcheck],['kcheck','allcheck','avgcheck'])
 
 def perform_check(inpjson="test_results.json"):
   rawdf,alldf = dp.format_autogen(inpjson)
   alldf = alldf.join(alldf['id'].apply(process_ids))
+  alldf = dp.kavergage_qmc(alldf,qmc_type='vmc')
   alldf['results'] = alldf.loc[alldf['results'].notnull(),'results']\
       .apply(dp.format_results)
   checkdf = alldf[alldf['results'].notnull()]\
       .groupby('material')\
       .apply(compare_results)
-  if checkdf['allcheck'].all():
+  if checkdf['allcheck'].all() and checkdf['avgcheck'].all():
     print("Clear pass!")
   else:
     print("Potential problem.")
+    if not checkdf['allcheck'].all():
+      print("Some k-points don't match:")
+      print(checkdf.loc[~alldf['allcheck'],:])
+    if not checkdf['avgcheck'].all():
+      print("Average doesn't match:")
+      print(checkdf.loc[~checkdf['avgcheck'],:])
   if alldf['results'].isnull().any():
     print("Although, some are not done.")
 

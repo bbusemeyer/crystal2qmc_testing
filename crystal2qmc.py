@@ -399,6 +399,7 @@ def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='new'):
   eigvecs_real = eigsys['eigvecs'][kpt]['real']
   eigvecs_imag = eigsys['eigvecs'][kpt]['imag']
   # XXX bug if number of shells differs for each atom.
+  print(basis.keys())
   nao_atom = int(round(sum(basis['nao_shell']) / len(ions['positions'])))
   coef_cnt = 1
   totnmo = basis['nmo'] * eigsys['nspin']
