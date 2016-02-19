@@ -164,11 +164,14 @@ def read_kred(info,basis):
   cursor += 9
   # Inequivilent k-point coord in reciprocal basis.
   ikpt_coords = np.array([int(w) for w in kred_words[cursor:cursor+3*nikpts]])
-  ikpt_coords = ikpt_coords.reshape(nikpts,3)
+  ikpt_coords = map(tuple,ikpt_coords.reshape(nikpts,3))
+  # Useful to compare to old output format.
+  eigsys['kpt_index'] = dict(zip(ikpt_coords,range(len(ikpt_coords))))
   cursor += 3*nikpts
   # is complex (0) or not (1), converted to True (if complex) or False
-  eigsys['ikpt_iscmpx'] = \
+  ikpt_iscmpx = \
     np.array([int(w) for w in kred_words[cursor:cursor+nikpts]]) == 0
+  eigsys['ikpt_iscmpx'] = dict(zip(ikpt_coords,ikpt_iscmpx))
   cursor += nikpts
   # Skip symmetry information.
   cursor += 9*48
@@ -192,9 +195,9 @@ def read_kred(info,basis):
   nao = sum(basis['nao_shell'])
   ncpnts = int(nevals_kpt * nao)
   kpt_coords   = []
-  # eigvecs[<real/imag>][kpoint][<spin up/spin down>]
+  # Format: eigvecs[kpoint][<real/imag>][<spin up/spin down>]
   eigvecs = {}
-  for kidx in range(nkpts*eigsys['nspin']):
+  for kpt in range(nkpts*eigsys['nspin']):
     try:
       new_kpt_coord = tuple([int(w) for w in kred_words[cursor:cursor+3]])
     except IndexError: # End of file.
@@ -203,10 +206,9 @@ def read_kred(info,basis):
     cursor += 3
 
     # If new_kpt_coord is an inequivilent point...
-    ikidx = np.prod(np.array(new_kpt_coord) == ikpt_coords,1) == 1
-    if any(ikidx):
+    if new_kpt_coord in ikpt_coords:
       # If complex...
-      if eigsys['ikpt_iscmpx'][ikidx]:
+      if eigsys['ikpt_iscmpx'][new_kpt_coord]:
         eig_k = np.array([float(w) for w in kred_words[cursor:cursor+2*ncpnts]])
         cursor += 2*ncpnts
         eig_k = eig_k.reshape(ncpnts,2)
@@ -257,7 +259,7 @@ def read_kred(info,basis):
   # up and spin down, because we only read in inequivilent kpoints. However,
   # ordering might be different, and the ordering is correct for kpt_coords.
   # If there are bugs, this might be a source.
-  eigsys['kpt_coords']   = ikpt_coords # kpt_coords
+  eigsys['kpt_coords'] = ikpt_coords # kpt_coords
   eigsys['eigvecs'] = eigvecs
 
   return eigsys
@@ -292,8 +294,9 @@ def find_basis_cutoff(lat_parm):
   return min(heights)/cutoff_divider
 
 ###############################################################################
-def write_slater(basis,eigsys,kidx,base="qwalk"):
-  kbase = base + '_' + str(kidx)
+def write_slater(basis,eigsys,kpt,base="qwalk",kfmt='new'):
+  if kfmt == 'old': kbase = base + '_' + "{}".format(eigsys['kpt_index'][kpt])
+  else:             kbase = base + '_' + "{}{}{}".format(*kpt)
   ntot = basis['ntot']
   nmo  = basis['nmo']
   nup  = eigsys['nup']
@@ -302,7 +305,7 @@ def write_slater(basis,eigsys,kidx,base="qwalk"):
   dnorbs = np.arange(ndn)+1
   if eigsys['nspin'] > 1:
     dnorbs += nmo
-  if eigsys['ikpt_iscmpx'][kidx]: orbstr = "CORBITALS"
+  if eigsys['ikpt_iscmpx'][kpt]: orbstr = "CORBITALS"
   else:                           orbstr = "ORBITALS"
   uporblines = ["{:5d}".format(orb) for orb in uporbs]
   width = 10
@@ -336,7 +339,7 @@ def write_slater(basis,eigsys,kidx,base="qwalk"):
 ###############################################################################
 # f orbital normalizations are from 
 # <http://winter.group.shef.ac.uk/orbitron/AOs/4f/equations.html>
-def normalize_eigvec(eigsys,basis,kidx):
+def normalize_eigvec(eigsys,basis,kpt):
   snorm = 1./(4.*np.pi)**0.5
   pnorm = snorm*(3.)**.5
   dnorms = [
@@ -377,20 +380,24 @@ def normalize_eigvec(eigsys,basis,kidx):
   if any(ao_type==1):
     error("sp orbtials not implemented in normalize_eigvec(...)","Not implemented")
 
-  for part in ['eigvecs_real','eigvecs_imag']:
-    eigsys[part][kidx][:,ao_type==0] *= snorm
-    eigsys[part][kidx][:,ao_type==2] *= pnorm
-    eigsys[part][kidx][:,ao_type==3] *= dnorms
-    eigsys[part][kidx][:,ao_type==4] *= fnorms
+  for part in ['real','imag']:
+    for spin in range(eigsys['nspin']):
+      eigsys['eigvecs'][kpt][part][spin][:,ao_type==0] *= snorm
+      eigsys['eigvecs'][kpt][part][spin][:,ao_type==2] *= pnorm
+      eigsys['eigvecs'][kpt][part][spin][:,ao_type==3] *= dnorms
+      eigsys['eigvecs'][kpt][part][spin][:,ao_type==4] *= fnorms
   return None
       
 ###############################################################################
 # This assumes you have called normalize_eigvec first! TODO better coding style?
 # TODO: see "bug" below.
-def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
-  outf = open(base + '_' + str(kidx) + ".orb",'w')
-  eigvecs_real = eigsys['eigvecs_real'][kidx]
-  eigvecs_imag = eigsys['eigvecs_imag'][kidx]
+def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='new'):
+  if kfmt == 'old':
+    outf = open(base + '_' + "{}".format(eigsys['kpt_index'][kpt]) + ".orb",'w')
+  else:
+    outf = open(base + '_' + "{}{}{}".format(*kpt) + ".orb",'w')
+  eigvecs_real = eigsys['eigvecs'][kpt]['real']
+  eigvecs_imag = eigsys['eigvecs'][kpt]['imag']
   # XXX bug if number of shells differs for each atom.
   nao_atom = int(round(sum(basis['nao_shell']) / len(ions['positions'])))
   coef_cnt = 1
@@ -402,34 +409,38 @@ def write_orb(eigsys,basis,ions,kidx,base="qwalk"):
             .format(moidx,aoidx,atidx,coef_cnt))
         coef_cnt += 1
   coef_cnt -= 1 # Last increment doesn't count.
-  if coef_cnt != eigvecs_real.size:
+  if coef_cnt != eigsys['nspin']*eigvecs_real[0].size:
     error("Error: Number of coefficients not coming out correctly!\n"+\
-          "Counted: {0} \nAvailable: {1}".format(coef_cnt,eigvecs_real.size),
+          "Counted: {0} \nAvailable: {1}"\
+          .format(coef_cnt,eigsys['nspin']*eigvecs_real[0].size),
           "Debug Error")
-  eigreal_flat = eigvecs_real.flatten()
-  eigimag_flat = eigvecs_imag.flatten()
+  eigreal_flat = [e.flatten() for e in eigvecs_real]
+  eigimag_flat = [e.flatten() for e in eigvecs_imag]
   print_cnt = 0
   outf.write("COEFFICIENTS\n")
-  for cidx in range(coef_cnt):
-    if eigsys['ikpt_iscmpx'][kidx]:
-      outf.write("({:<.12e},{:<.12e}) "\
-          .format(eigreal_flat[cidx],eigimag_flat[cidx]))
-    else:
-      outf.write("{:< 15.12e} ".format(eigreal_flat[cidx]))
-    print_cnt += 1
-    if print_cnt % 5 == 0: outf.write("\n")
+  for sidx in range(eigsys['nspin']):
+    #for cidx in range(coef_cnt):
+    for cidx in range(eigreal_flat[sidx].size):
+      if eigsys['ikpt_iscmpx'][kpt]:
+        outf.write("({:<.12e},{:<.12e}) "\
+            .format(eigreal_flat[sidx][cidx],eigimag_flat[sidx][cidx]))
+      else:
+        outf.write("{:< 15.12e} ".format(eigreal_flat[sidx][cidx]))
+      print_cnt += 1
+      if print_cnt % 5 == 0: outf.write("\n")
   outf.close()
   return None
 
 ###############################################################################
 # TODO Molecule.
 # TODO Generalize to no pseudopotential.
-def write_sys(lat_parm,basis,eigsys,pseudo,ions,kidx,base="qwalk"):
+def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
   min_exp = min(basis['prim_gaus'])
   cutoff_length = (-np.log(1e-8)/min_exp)**.5
   basis_cutoff = find_basis_cutoff(lat_parm)
   cutoff_divider = basis_cutoff*2.0 / cutoff_length
-  kbase = base + '_' + str(kidx)
+  if kfmt == 'old': kbase = base + '_' + "{}".format(eigsys['kpt_index'][kpt])
+  else:             kbase = base + '_' + "{}{}{}".format(*kpt)
   outlines = [
       "system { periodic",
       "  nspin {{ {} {} }}".format(eigsys['nup'],eigsys['ndn']),
@@ -442,7 +453,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kidx,base="qwalk"):
       "  origin { 0 0 0 }",
       "  cutoff_divider {0}".format(cutoff_divider),
       "  kpoint {{ {:4}   {:4}   {:4} }}".format(
-          *(eigsys['kpt_coords'][kidx]/eigsys['nkpts_dir']*2.)
+          *(np.array(kpt)/eigsys['nkpts_dir']*2.)
         )
     ]
   for aidx in range(len(ions['positions'])):
@@ -640,7 +651,7 @@ def write_moanalysis():
 
 ###############################################################################
 # Begin actual execution.
-def convert_crystal(base="qwalk"):
+def convert_crystal(base="qwalk",kfmt='old'):
   info, lat_parm, ions, basis, pseudo = read_gred()
   eigsys = read_kred(info,basis)
 
@@ -655,11 +666,11 @@ def convert_crystal(base="qwalk"):
   eigsys['nup'] = int(round(0.5 * (basis['ntot'] + eigsys['totspin'])))
   eigsys['ndn'] = int(round(0.5 * (basis['ntot'] - eigsys['totspin'])))
   
-  for (kidx,kpt) in enumerate(eigsys['kpt_coords']):
-    write_slater(basis,eigsys,kidx,base)
-    normalize_eigvec(eigsys,basis,kidx)
-    write_orb(eigsys,basis,ions,kidx,base)
-    write_sys(lat_parm,basis,eigsys,pseudo,ions,kidx,base)
+  for kpt in eigsys['kpt_coords']:
+    write_slater(basis,eigsys,kpt,base,kfmt)
+    normalize_eigvec(eigsys,basis,kpt)
+    write_orb(eigsys,basis,ions,kpt,base,kfmt)
+    write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base,kfmt)
     write_basis(basis,ions,base)
     write_jast2(lat_parm,ions,base)
 
