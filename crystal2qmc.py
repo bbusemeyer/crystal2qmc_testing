@@ -390,7 +390,6 @@ def normalize_eigvec(eigsys,basis,kpt):
       
 ###############################################################################
 # This assumes you have called normalize_eigvec first! TODO better coding style?
-# TODO: see "bug" below.
 def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='new'):
   if kfmt == 'old':
     outf = open(base + '_' + "{}".format(eigsys['kpt_index'][kpt]) + ".orb",'w')
@@ -398,14 +397,16 @@ def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='new'):
     outf = open(base + '_' + "{}{}{}".format(*kpt) + ".orb",'w')
   eigvecs_real = eigsys['eigvecs'][kpt]['real']
   eigvecs_imag = eigsys['eigvecs'][kpt]['imag']
-  # XXX bug if number of shells differs for each atom.
-  print(basis.keys())
-  nao_atom = int(round(sum(basis['nao_shell']) / len(ions['positions'])))
+  atidxs = np.unique(basis['atom_shell'])-1
+  nao_atom = np.zeros(atidxs.size,dtype=int)
+  for shidx in range(len(basis['nao_shell'])):
+    nao_atom[basis['atom_shell'][shidx]-1] += basis['nao_shell'][shidx]
+  #nao_atom = int(round(sum(basis['nao_shell']) / len(ions['positions'])))
   coef_cnt = 1
   totnmo = basis['nmo'] * eigsys['nspin']
   for moidx in np.arange(totnmo)+1:
-    for atidx in np.unique(basis['atom_shell']):
-      for aoidx in np.arange(nao_atom)+1:
+    for atidx in atidxs+1:
+      for aoidx in np.arange(nao_atom[atidx-1])+1:
         outf.write(" {:5d} {:5d} {:5d} {:5d}\n"\
             .format(moidx,aoidx,atidx,coef_cnt))
         coef_cnt += 1
