@@ -43,6 +43,9 @@ def read_gred():
   par  = [int(w) for w in gred_words[cursor+nparms[1]:cursor+nparms[2]]]
   cursor += sum(nparms)
 
+  lat_parm['struct_dim'] = int(info[9])
+  print(lat_parm['struct_dim'])
+
   # Lattice parameters.
   lat_parm['prim_cell'] = \
       np.array([float(w) for w in gred_words[cursor:cursor+9]]).reshape(3,3).T
@@ -437,27 +440,34 @@ def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='new'):
 # TODO Molecule.
 # TODO Generalize to no pseudopotential.
 def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
+  outlines = []
   min_exp = min(basis['prim_gaus'])
   cutoff_length = (-np.log(1e-8)/min_exp)**.5
   basis_cutoff = find_basis_cutoff(lat_parm)
   cutoff_divider = basis_cutoff*2.0 / cutoff_length
   if kfmt == 'old': kbase = base + '_' + "{}".format(eigsys['kpt_index'][kpt])
   else:             kbase = base + '_' + "{}{}{}".format(*kpt)
-  outlines = [
-      "system { periodic",
-      "  nspin {{ {} {} }}".format(eigsys['nup'],eigsys['ndn']),
-      "  latticevec {",
-    ]
-  for i in range(3):
-    outlines.append("    {:< 15} {:< 15} {:< 15}".format(*lat_parm['prim_cell'][i]))
-  outlines += [
-      "  }",
-      "  origin { 0 0 0 }",
-      "  cutoff_divider {0}".format(cutoff_divider),
-      "  kpoint {{ {:4}   {:4}   {:4} }}".format(
-          *(np.array(kpt)/eigsys['nkpts_dir']*2.)
-        )
-    ]
+  if lat_parm['struct_dim'] != 0:
+    outlines += [
+        "system { periodic",
+        "  nspin {{ {} {} }}".format(eigsys['nup'],eigsys['ndn']),
+        "  latticevec {",
+      ]
+    for i in range(3):
+      outlines.append("    {:< 15} {:< 15} {:< 15}".format(*lat_parm['prim_cell'][i]))
+    outlines += [
+        "  }",
+        "  origin { 0 0 0 }",
+        "  cutoff_divider {0}".format(cutoff_divider),
+        "  kpoint {{ {:4}   {:4}   {:4} }}".format(
+            *(np.array(kpt)/eigsys['nkpts_dir']*2.)
+          )
+      ]
+  else: # is molecule.
+    outlines += [
+        "system { molecule",
+        "  nspin {{ {} {} }}".format(eigsys['nup'],eigsys['ndn']),
+      ]
   for aidx in range(len(ions['positions'])):
     if ions['atom_nums'][aidx]-200-1 < 0:
       error("All-electron calculations not implemented yet.","Not implemented")
