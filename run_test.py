@@ -23,13 +23,14 @@ default_job['dft']['edifftol'] = 6
 default_job['dft']['kmesh']=[4,4,4]
 default_job['dft']['spin_polarized']=False
 default_job['qmc']['vmc']['optimizer'] = None
-default_job['qmc']['vmc']['nblock'] = 20
+default_job['qmc']['vmc']['nblock'] = 100
 default_job['qmc']['vmc']['target_error'] = 0.01
 default_job['qmc']['kpoints']='complex'
 
 ##############################################
 # Simple Si calculation.
 # Set defaults.
+checking_this = True
 base = baseroot + "si_"
 element_list = [
     Cif2Crystal(),
@@ -50,7 +51,8 @@ element_list = [
 
 ref_job = deepcopy(default_job)
 ref_job['control']['id'] = base+"ref"
-results.append(jc.execute(ref_job,element_list))
+if checking_this:
+  results.append(jc.execute(ref_job,element_list))
 
 element_list[2] = \
     NewRunProperties(
@@ -61,10 +63,12 @@ element_list[3] = NewCrystal2QWalk()
 test_job = deepcopy(default_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-results.append(jc.execute(test_job,element_list))
+if checking_this:
+  results.append(jc.execute(test_job,element_list))
 
 ##############################################
 # Supercell Si calculation.
+checking_this = False
 base = baseroot + "sup_"
 
 element_list = [
@@ -90,7 +94,8 @@ cur_job['dft']['kmesh']=[3,3,3] # ensures one complex.
 
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
-#results.append(jc.execute(ref_job,element_list[:3]))
+if checking_this:
+  results.append(jc.execute(ref_job,element_list[:3]))
 
 element_list[2] = \
     NewRunProperties(
@@ -101,10 +106,12 @@ element_list[3] = NewCrystal2QWalk()
 test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-#results.append(jc.execute(test_job,element_list[:3]))
+if checking_this:
+  results.append(jc.execute(test_job,element_list[:3]))
 
 ##############################################
 # GaAs calculation (two different atoms).
+checking_this = True
 base = baseroot + "gaas_"
 
 element_list = [
@@ -130,7 +137,8 @@ cur_job['dft']['kmesh']=[3,3,3]
 
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
-results.append(jc.execute(ref_job,element_list))
+if checking_this:
+  results.append(jc.execute(ref_job,element_list))
 
 element_list[2] = \
     NewRunProperties(
@@ -141,10 +149,12 @@ element_list[3] = NewCrystal2QWalk()
 test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-results.append(jc.execute(test_job,element_list))
+if checking_this:
+  results.append(jc.execute(test_job,element_list))
 
 ##############################################
 # Fe calculation (Spin enabled).
+checking_this = True
 base = baseroot + "fe_"
 
 element_list = [
@@ -174,7 +184,8 @@ cur_job['total_spin'] = 2
 
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
-results.append(jc.execute(ref_job,element_list))
+if checking_this:
+  results.append(jc.execute(ref_job,element_list))
 
 element_list[2] = \
     NewRunProperties(
@@ -185,10 +196,12 @@ element_list[3] = NewCrystal2QWalk()
 test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-results.append(jc.execute(test_job,element_list))
+if checking_this:
+  results.append(jc.execute(test_job,element_list))
 
 ##############################################
 # KMnF3 calculation (Spin enabled).
+checking_this = True
 base = baseroot + "kmnf3_"
 
 element_list = [
@@ -218,7 +231,8 @@ cur_job['total_spin'] = 5
 
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
-results.append(jc.execute(ref_job,element_list))
+if checking_this:
+  results.append(jc.execute(ref_job,element_list))
 
 element_list[2] = \
     NewRunProperties(
@@ -229,10 +243,12 @@ element_list[3] = NewCrystal2QWalk()
 test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-results.append(jc.execute(test_job,element_list))
+if checking_this:
+  results.append(jc.execute(test_job,element_list))
 
 ##############################################
 # MnO calculation (Antiferromagnetic, expensive).
+checking_this = False
 base = baseroot + "mno_"
 
 element_list = [
@@ -262,7 +278,8 @@ cur_job['qmc']['vmc']['target_error'] = 0.02
 
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
-results.append(jc.execute(ref_job,element_list))
+if checking_this:
+  results.append(jc.execute(ref_job,element_list))
 
 element_list[2] = \
     NewRunProperties(
@@ -273,11 +290,14 @@ element_list[3] = NewCrystal2QWalk()
 test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-results.append(jc.execute(test_job,element_list))
+if checking_this:
+  results.append(jc.execute(test_job,element_list))
+
 
 ##############################################
-# CH3 (molecule).
-base = baseroot + "ch3_"
+# CO (molecule).
+checking_this = True
+base = baseroot + "co_"
 
 element_list = [
     Xyz2Crystal(),
@@ -296,11 +316,14 @@ element_list = [
         nn=1,np=8,time="20:00:00",queue="batch"))
   ]
 
-cur_job['xyz'] = jc.default_job_record("CH3.xyz")
+del cur_job['cif']
+cur_job['xyz'] = open("CO.xyz",'r').read()
+cur_job['qmc']['vmc']['target_error'] = 0.005
 
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
-#results.append(jc.execute(ref_job,element_list[:3]))
+if checking_this:
+  results.append(jc.execute(ref_job,element_list))
 
 element_list[2] = \
     NewRunProperties(
@@ -311,7 +334,8 @@ element_list[3] = NewCrystal2QWalk()
 test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-#results.append(jc.execute(test_job,element_list[:3]))
+if checking_this:
+  results.append(jc.execute(test_job,element_list))
 
 ###############################################
 # Gather and export.
@@ -325,3 +349,4 @@ except KeyError:
   print("KeyError occured, maybe no calculations have finished yet?")
 except IndexError:
   print("IndexError occured, maybe only one type of calculation has finished yet?")
+print("======================")

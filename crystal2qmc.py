@@ -44,7 +44,6 @@ def read_gred():
   cursor += sum(nparms)
 
   lat_parm['struct_dim'] = int(info[9])
-  print(lat_parm['struct_dim'])
 
   # Lattice parameters.
   lat_parm['prim_cell'] = \
@@ -284,17 +283,20 @@ def read_outputfile(fname = "prop.in.o"):
 
 ###############################################################################
 def find_basis_cutoff(lat_parm):
-  latvec = lat_parm['prim_cell']
-  cutoff_divider = 2.000001
-  cross01 = np.cross(latvec[0], latvec[1])
-  cross12 = np.cross(latvec[1], latvec[2])
-  cross02 = np.cross(latvec[0], latvec[2])
+  if lat_parm['struct_dim'] > 0:
+    latvec = lat_parm['prim_cell']
+    cutoff_divider = 2.000001
+    cross01 = np.cross(latvec[0], latvec[1])
+    cross12 = np.cross(latvec[1], latvec[2])
+    cross02 = np.cross(latvec[0], latvec[2])
 
-  heights = [0,0,0]
-  heights[0]=abs(np.dot(latvec[0], cross12)/np.dot(cross12,cross12)**.5)
-  heights[1]=abs(np.dot(latvec[1], cross02)/np.dot(cross02,cross02)**.5)
-  heights[2]=abs(np.dot(latvec[2], cross01)/np.dot(cross01,cross01)**.5)
-  return min(heights)/cutoff_divider
+    heights = [0,0,0]
+    heights[0]=abs(np.dot(latvec[0], cross12)/np.dot(cross12,cross12)**.5)
+    heights[1]=abs(np.dot(latvec[1], cross02)/np.dot(cross02,cross02)**.5)
+    heights[2]=abs(np.dot(latvec[2], cross01)/np.dot(cross01,cross01)**.5)
+    return min(heights)/cutoff_divider
+  else:
+    return 7.5
 
 ###############################################################################
 def write_slater(basis,eigsys,kpt,base="qwalk",kfmt='new'):
@@ -308,8 +310,8 @@ def write_slater(basis,eigsys,kpt,base="qwalk",kfmt='new'):
   dnorbs = np.arange(ndn)+1
   if eigsys['nspin'] > 1:
     dnorbs += nmo
-  if eigsys['ikpt_iscmpx'][kpt]: orbstr = "CORBITALS"
-  else:                           orbstr = "ORBITALS"
+  if eigsys['ikpt_iscmpx'][kpt]: orbstr = "corbitals"
+  else:                          orbstr = "orbitals"
   uporblines = ["{:5d}".format(orb) for orb in uporbs]
   width = 10
   for i in reversed(range(width,len(uporblines),width)):
@@ -318,17 +320,17 @@ def write_slater(basis,eigsys,kpt,base="qwalk",kfmt='new'):
   for i in reversed(range(width,len(dnorblines),width)):
     dnorblines.insert(i,"\n ")
   outlines = [
-      "SLATER",
+      "slater",
       "{0} {{".format(orbstr),
-      "CUTOFF_MO",
-      "  MAGNIFY 1",
-      "  NMO {0}".format(dnorbs[-1]),
-      "  ORBFILE {0}.orb".format(kbase),
-      "  INCLUDE {0}.basis".format(base),
-      "  CENTERS { USEGLOBAL }",
+      "cutoff_mo",
+      "  magnify 1",
+      "  nmo {0}".format(dnorbs[-1]),
+      "  orbfile {0}.orb".format(kbase),
+      "  include {0}.basis".format(base),
+      "  centers { useglobal }",
       "}",
-      "DETWT { 1.0 }",
-      "STATES {",
+      "detwt { 1.0 }",
+      "states {",
       "  # Spin up orbitals.", 
       "  " + " ".join(uporblines),
       "  # Spin down orbitals.",
