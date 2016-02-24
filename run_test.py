@@ -357,8 +357,8 @@ if checking_this:
 test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
-#if checking_this:
-#  results.append(jc.execute(test_job,element_list))
+if checking_this:
+  results.append(jc.execute(test_job,element_list))
 
 ###############################################
 # Gather and export.
