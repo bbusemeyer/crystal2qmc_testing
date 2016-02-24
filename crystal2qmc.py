@@ -160,7 +160,7 @@ def read_gred():
       pseudo[atom] = {}
       pseudo[atom]['prefactors'] = prefactors[start:end]
       pseudo[atom]['r_exps'] = r_exps[start:end]
-      pseudo[atom]['n_per_j'] = n_per_j[npjlen*aidx:npjlen*(aidx+1)]
+      pseudo[atom]['n_per_j'] = n_per_j[npjlen*psidx:npjlen*(psidx+1)]
       pseudo[atom]['exponents'] = exponents[start:end]
 
   print("pseudo",pseudo)
@@ -516,7 +516,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
               "Not implemented.")
 
     n_per_j = n_per_j[n_per_j>0]
-    order = list(np.arange(n_per_j[0],sum(n_per_j)-1)) + \
+    order = list(np.arange(n_per_j[0],sum(n_per_j))) + \
             list(np.arange(n_per_j[0])) 
     print("order",order)
     exponents   = pseudo[elem]['exponents'][order]
