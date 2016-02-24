@@ -95,7 +95,6 @@ def read_gred():
   cursor += 2*nprim
   # Atomic numbers.
   ions['atom_nums'] = np.array(gred_words[cursor:cursor+natoms],dtype=int)
-  print("atom_nums",ions['atom_nums'])
   cursor += natoms
   # First shell of each atom (skip extra number after).
   basis['first_shell'] = np.array(gred_words[cursor:cursor+natoms],dtype=int)
@@ -122,13 +121,11 @@ def read_gred():
   # Pseudopotential information.
   # Pseudopotential for each element.
   pseudo_atom = np.array(gred_words[cursor:cursor+natoms],dtype=int)
-  print("pseudo_atom",pseudo_atom)
   cursor += natoms
   cursor += 1 # skip INFPOT
   ngauss = int(gred_words[cursor])
   cursor += 1
   headlen = int(gred_words[cursor])
-  print("headlen",headlen)
   cursor += 1
   # Number of pseudopotentials.
   numpseudo = int(gred_words[cursor])
@@ -139,10 +136,8 @@ def read_gred():
   # Number of Gaussians for angular momenutum j
   n_per_j = np.array(gred_words[cursor:cursor+headlen],dtype=int)
   cursor += headlen
-  print("n_per_j",n_per_j)
   # index of first n_per_j for each pseudo.
   pseudo_start = np.array(gred_words[cursor:cursor+numpseudo],dtype=int)
-  print("pseudo_start",pseudo_start)
   cursor += numpseudo + 1
   # Actual floats of pseudopotential.
   exponents = np.array(gred_words[cursor:cursor+ngauss],dtype=float)
@@ -163,7 +158,6 @@ def read_gred():
       pseudo[atom]['n_per_j'] = n_per_j[npjlen*psidx:npjlen*(psidx+1)]
       pseudo[atom]['exponents'] = exponents[start:end]
 
-  print("pseudo",pseudo)
   return info, lat_parm, ions, basis, pseudo
 
 ###############################################################################
@@ -505,9 +499,6 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
   for elem in pseudo.keys():
     atom_name = periodic_table[elem-200-1]
     n_per_j = pseudo[elem]['n_per_j']
-    print("elem,n_per_j")
-    print(elem)
-    print(n_per_j)
     numL = sum(n_per_j>0)
 
     for i in range(1,len(n_per_j)):
@@ -518,7 +509,6 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
     n_per_j = n_per_j[n_per_j>0]
     order = list(np.arange(n_per_j[0],sum(n_per_j))) + \
             list(np.arange(n_per_j[0])) 
-    print("order",order)
     exponents   = pseudo[elem]['exponents'][order]
     prefactors  = pseudo[elem]['prefactors'][order]
     r_exps      = pseudo[elem]['r_exps'][order]
@@ -686,9 +676,6 @@ def write_moanalysis():
 # Begin actual execution.
 def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='old'):
   info, lat_parm, ions, basis, pseudo = read_gred()
-  for key in pseudo.keys():
-    print(key)
-    print(pseudo[key]['exponents'])
   eigsys = read_kred(info,basis)
 
   if eigsys['nspin'] > 1:

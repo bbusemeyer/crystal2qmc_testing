@@ -226,7 +226,7 @@ cur_job['cif'] = open("KMnF3.cif",'r').read()
 cur_job['dft']['kmesh']=[3,3,3]
 cur_job['dft']['spin_polarized']=True
 cur_job['dft']['initial_spin'] = [0,1,0,0,0]
-cur_job['qmc']['vmc']['target_error'] = 0.02
+cur_job['qmc']['vmc']['target_error'] = 0.05
 cur_job['total_spin'] = 5
 
 ref_job = deepcopy(cur_job)
@@ -274,7 +274,7 @@ cur_job['supercell'] = [[2,0,0],[0,2,0],[0,0,2]]
 cur_job['dft']['initial_spin'] = [1,1,1,-1,1,-1,-1,-1,0,0,0,0,0,0,0,0]
 cur_job['dft']['kmesh']=[3,3,3]
 cur_job['dft']['spin_polarized']=True
-cur_job['qmc']['vmc']['target_error'] = 0.02
+cur_job['qmc']['vmc']['target_error'] = 0.05
 
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
@@ -336,6 +336,29 @@ test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
 if checking_this:
   results.append(jc.execute(test_job,element_list))
+
+##############################################
+# Graphene (2-d system)
+checking_this = True
+base = baseroot + "graphene_"
+element_list = [
+    QWalkRunVMC(
+      submitter=ver.LocalVeritasQwalkSubmitter(
+        nn=1,np=8,time="20:00:00",queue="batch"))
+  ]
+
+cur_job['qmc']['vmc']['target_error'] = 0.01
+
+ref_job = deepcopy(cur_job)
+ref_job['control']['id'] = base+"ref"
+if checking_this:
+  results.append(jc.execute(ref_job,element_list))
+
+test_job = deepcopy(cur_job)
+test_job['control']['id'] = base+"test"
+test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
+#if checking_this:
+#  results.append(jc.execute(test_job,element_list))
 
 ###############################################
 # Gather and export.
