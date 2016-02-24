@@ -698,4 +698,17 @@ def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='old'):
     write_jast2(lat_parm,ions,base)
 
 if __name__ == "__main__":
-  convert_crystal()
+  if len(sys.argv) > 1:
+    base = sys.argv[1]
+  else: 
+    base = "qwalk"
+  if len(sys.argv) > 2:
+    propoutfn = sys.argv[2]
+  else:
+    propoutfn = "prop.in.o"
+  if len(sys.argv) > 3:
+    kfmt = sys.argv[3]
+  else:
+    kfmt="new"
+  print("Converting crystal with base {}, system spin drawn from {}, and using {} kpoint naming convention".format(base,propoutfn,kfmt))
+  convert_crystal(base,propoutfn,kfmt)
