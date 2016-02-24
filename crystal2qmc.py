@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division,print_function
 import numpy as np
 import sys
 
@@ -49,7 +49,7 @@ def read_gred():
   lat_parm['prim_cell'] = \
       np.array([float(w) for w in gred_words[cursor:cursor+9]]).reshape(3,3).T
   cursor += 9
-  prim_trans= np.array([float(w) for w in gred_words[cursor:cursor+9]]).reshape(3,3)
+  prim_trans= np.array(gred_words[cursor:cursor+9],dtype=float).reshape(3,3)
   cursor += 9
   lat_parm['conv_cell'] = prim_trans.dot(lat_parm['prim_cell'])
   cursor += info[1] + 48*48 + 9*info[1] + 3*info[1] # Skip symmetry part.
@@ -62,7 +62,7 @@ def read_gred():
   ions['charges'] = [float(w) for w in gred_words[cursor:cursor+natoms]]
   cursor += natoms
   # Atom positions.
-  atom_poss = np.array([float(w) for w in gred_words[cursor:cursor+3*natoms]])
+  atom_poss = np.array(gred_words[cursor:cursor+3*natoms],dtype=float)
   ions['positions'] = atom_poss.reshape(natoms,3)
   cursor += 3*natoms
 
@@ -70,79 +70,100 @@ def read_gred():
   nshells = info[19]
   nprim   = info[74]
   # Formal charge of shell.
-  basis['charges'] = np.array([float(w) for w in gred_words[cursor:cursor+nshells]])
+  basis['charges'] = np.array(gred_words[cursor:cursor+nshells],dtype=float)
   cursor += nshells
   # "Adjoined gaussian" of shells.
-  basis['adj_gaus'] = np.array([float(w) for w in gred_words[cursor:cursor+nshells]])
+  basis['adj_gaus'] = np.array(gred_words[cursor:cursor+nshells],dtype=float)
   cursor += nshells
   # Position of shell.
-  shell_poss = np.array([float(w) for w in gred_words[cursor:cursor+3*nshells]])
+  shell_poss = np.array(gred_words[cursor:cursor+3*nshells],dtype=float)
   basis['positions'] = shell_poss.reshape(nshells,3)
   cursor += 3*nshells
   # Primitive gaussian exponents.
-  basis['prim_gaus'] = np.array([float(w) for w in gred_words[cursor:cursor+nprim]])
+  basis['prim_gaus'] = np.array(gred_words[cursor:cursor+nprim],dtype=float)
   cursor += nprim
   # Coefficients of s, p, d, and (?).
-  basis['coef_s'] = np.array([float(w) for w in gred_words[cursor:cursor+nprim]])
+  basis['coef_s'] = np.array(gred_words[cursor:cursor+nprim],dtype=float)
   cursor += nprim
-  basis['coef_p'] = np.array([float(w) for w in gred_words[cursor:cursor+nprim]])
+  basis['coef_p'] = np.array(gred_words[cursor:cursor+nprim],dtype=float)
   cursor += nprim
-  basis['coef_dfg'] = np.array([float(w) for w in gred_words[cursor:cursor+nprim]])
+  basis['coef_dfg'] = np.array(gred_words[cursor:cursor+nprim],dtype=float)
   cursor += nprim
-  basis['coef_max'] = np.array([float(w) for w in gred_words[cursor:cursor+nprim]])
+  basis['coef_max'] = np.array(gred_words[cursor:cursor+nprim],dtype=float)
   cursor += nprim
   # Skip "old normalization"
   cursor += 2*nprim
   # Atomic numbers.
-  ions['atom_nums'] = np.array([int(w) for w in gred_words[cursor:cursor+natoms]])
+  ions['atom_nums'] = np.array(gred_words[cursor:cursor+natoms],dtype=int)
+  print("atom_nums",ions['atom_nums'])
   cursor += natoms
   # First shell of each atom (skip extra number after).
-  basis['first_shell'] = np.array([int(w) for w in gred_words[cursor:cursor+natoms]])
+  basis['first_shell'] = np.array(gred_words[cursor:cursor+natoms],dtype=int)
   cursor += natoms + 1
   # First primitive of each shell (skips an extra number after).
-  basis['first_prim'] = np.array([int(w) for w in gred_words[cursor:cursor+nshells]])
+  basis['first_prim'] = np.array(gred_words[cursor:cursor+nshells],dtype=int)
   cursor += nshells + 1
   # Number of prims per shell.
-  basis['prim_shell'] = np.array([int(w) for w in gred_words[cursor:cursor+nshells]])
+  basis['prim_shell'] = np.array(gred_words[cursor:cursor+nshells],dtype=int)
   cursor += nshells
   # Type of shell: 0=s,1=sp,2=p,3=d,4=f.
-  basis['shell_type'] = np.array([int(w) for w in gred_words[cursor:cursor+nshells]])
+  basis['shell_type'] = np.array(gred_words[cursor:cursor+nshells],dtype=int)
   cursor += nshells
   # Number of atomic orbtials per shell.
-  basis['nao_shell'] = np.array([int(w) for w in gred_words[cursor:cursor+nshells]])
+  basis['nao_shell'] = np.array(gred_words[cursor:cursor+nshells],dtype=int)
   cursor += nshells
   # First atomic orbtial per shell (skip extra number after).
-  basis['first_ao'] = np.array([int(w) for w in gred_words[cursor:cursor+nshells]])
+  basis['first_ao'] = np.array(gred_words[cursor:cursor+nshells],dtype=int)
   cursor += nshells + 1
   # Atom to which each shell belongs.
-  basis['atom_shell'] = np.array([int(w) for w in gred_words[cursor:cursor+nshells]])
+  basis['atom_shell'] = np.array(gred_words[cursor:cursor+nshells],dtype=int)
   cursor += nshells
 
   # Pseudopotential information.
-  # Skipping what I assume is what type of pseudopot input it is.
-  cursor += natoms+1
+  # Pseudopotential for each element.
+  pseudo_atom = np.array(gred_words[cursor:cursor+natoms],dtype=int)
+  print("pseudo_atom",pseudo_atom)
+  cursor += natoms
+  cursor += 1 # skip INFPOT
   ngauss = int(gred_words[cursor])
   cursor += 1
   headlen = int(gred_words[cursor])
+  print("headlen",headlen)
   cursor += 1
-  # (?)
-  itpse = int(gred_words[cursor])
+  # Number of pseudopotentials.
+  numpseudo = int(gred_words[cursor])
   cursor += 1
   # Exponents of r^l prefactor.
-  pseudo['r_exps'] = -1*np.array([int(w) for w in gred_words[cursor:cursor+ngauss]])
+  r_exps = -1*np.array(gred_words[cursor:cursor+ngauss],dtype=int)
   cursor += ngauss
   # Number of Gaussians for angular momenutum j
-  pseudo['n_per_j'] = np.array([int(w) for w in gred_words[cursor:cursor+headlen]])
+  n_per_j = np.array(gred_words[cursor:cursor+headlen],dtype=int)
   cursor += headlen
-  # (?) Not used.
-  nsom = [int(w) for w in gred_words[cursor:cursor+itpse]]
-  cursor += itpse + 1
+  print("n_per_j",n_per_j)
+  # index of first n_per_j for each pseudo.
+  pseudo_start = np.array(gred_words[cursor:cursor+numpseudo],dtype=int)
+  print("pseudo_start",pseudo_start)
+  cursor += numpseudo + 1
   # Actual floats of pseudopotential.
-  pseudo['exponents'] = np.array([float(w) for w in gred_words[cursor:cursor+ngauss]])
+  exponents = np.array(gred_words[cursor:cursor+ngauss],dtype=float)
   cursor += ngauss
-  pseudo['prefactors'] = np.array([float(w) for w in gred_words[cursor:cursor+ngauss]])
+  prefactors = np.array(gred_words[cursor:cursor+ngauss],dtype=float)
   cursor += ngauss
+  # Store information nicely.
+  npjlen = headlen / len(pseudo_start)
+  for aidx,atom in enumerate(ions['atom_nums']):
+    psidx = pseudo_atom[aidx]-1
+    start = pseudo_start[psidx]
+    if psidx+1 >= len(pseudo_start): end = ngauss
+    else                           : end = pseudo_start[psidx+1]
+    if atom not in pseudo.keys():
+      pseudo[atom] = {}
+      pseudo[atom]['prefactors'] = prefactors[start:end]
+      pseudo[atom]['r_exps'] = r_exps[start:end]
+      pseudo[atom]['n_per_j'] = n_per_j[npjlen*aidx:npjlen*(aidx+1)]
+      pseudo[atom]['exponents'] = exponents[start:end]
 
+  print("pseudo",pseudo)
   return info, lat_parm, ions, basis, pseudo
 
 ###############################################################################
@@ -161,11 +182,11 @@ def read_kred(info,basis):
   nikpts = int(kred_words[cursor])
   cursor += 1
   # Reciprocal basis.
-  recip_vecs = np.array([float(w) for w in kred_words[cursor:cursor+9]])
+  recip_vecs = np.array(kred_words[cursor:cursor+9],dtype=float)
   eigsys['recip_vecs'] = recip_vecs.reshape(3,3)
   cursor += 9
   # Inequivilent k-point coord in reciprocal basis.
-  ikpt_coords = np.array([int(w) for w in kred_words[cursor:cursor+3*nikpts]])
+  ikpt_coords = np.array(kred_words[cursor:cursor+3*nikpts],int)
   ikpt_coords = map(tuple,ikpt_coords.reshape(nikpts,3))
   # Useful to compare to old output format.
   eigsys['kpt_index'] = dict(zip(ikpt_coords,range(len(ikpt_coords))))
@@ -178,15 +199,15 @@ def read_kred(info,basis):
   # Skip symmetry information.
   cursor += 9*48
   # Geometric weight of kpoints.
-  eigsys['kpt_weights'] = [float(w) for w in kred_words[cursor:cursor+nikpts]]
+  eigsys['kpt_weights'] = np.array(kred_words[cursor:cursor+nikpts],dtype=float)
   cursor += nikpts
   # Eigenvalues: (how many) = (spin) * (number of basis) * (number of kpoints)
   eigsys['nspin'] = info[63]+1
   nevals = eigsys['nspin']*info[6]*nikpts
-  eigsys['eigvals'] = [float(w) for w in kred_words[cursor:cursor+nevals]]
+  eigsys['eigvals'] = np.array(kred_words[cursor:cursor+nevals],dtype=float)
   cursor += nevals
   # Weights of eigenvales--incorperating Fermi energy cutoff.
-  eig_weights = [float(w) for w in kred_words[cursor:cursor+nevals]]
+  eig_weights = np.array(kred_words[cursor:cursor+nevals],dtype=float)
   cursor += nevals
 
   # Read in eigenvectors at inequivilent kpoints. Can't do all kpoints because we 
@@ -211,7 +232,7 @@ def read_kred(info,basis):
     if new_kpt_coord in ikpt_coords:
       # If complex...
       if eigsys['ikpt_iscmpx'][new_kpt_coord]:
-        eig_k = np.array([float(w) for w in kred_words[cursor:cursor+2*ncpnts]])
+        eig_k = np.array(kred_words[cursor:cursor+2*ncpnts],dtype=float)
         cursor += 2*ncpnts
         eig_k = eig_k.reshape(ncpnts,2)
         kpt_coords.append(new_kpt_coord)
@@ -229,7 +250,7 @@ def read_kred(info,basis):
           eigvecs[new_kpt_coord]['imag'] = \
             [eig_k[:,1].reshape(int(round(ncpnts/nao)),nao)]
       else: # ...else real.
-        eig_k = np.array([float(w) for w in kred_words[cursor:cursor+ncpnts]])
+        eig_k = np.array(kred_words[cursor:cursor+ncpnts],dtype=float)
         cursor += ncpnts
         kpt_coords.append(new_kpt_coord)
         if new_kpt_coord in eigvecs.keys():
@@ -439,7 +460,6 @@ def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='new'):
   return None
 
 ###############################################################################
-# TODO Molecule.
 # TODO Generalize to no pseudopotential.
 def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
   outlines = []
@@ -481,13 +501,13 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
       )
     )
   outlines.append("}")
-  ps_cursor = 0
   done = []
-  for aidx,eidx in enumerate(ions['atom_nums']):
-    if eidx not in done: done.append(eidx)
-    else:                continue
-    atom_name = periodic_table[eidx-200-1]
-    n_per_j = pseudo['n_per_j'][(len(done)-1)*NPS_TYPES:len(done)*NPS_TYPES]
+  for elem in pseudo.keys():
+    atom_name = periodic_table[elem-200-1]
+    n_per_j = pseudo[elem]['n_per_j']
+    print("elem,n_per_j")
+    print(elem)
+    print(n_per_j)
     numL = sum(n_per_j>0)
 
     for i in range(1,len(n_per_j)):
@@ -496,11 +516,12 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
               "Not implemented.")
 
     n_per_j = n_per_j[n_per_j>0]
-    order = list(np.arange(n_per_j[0],sum(n_per_j))+ps_cursor) + \
-            list(np.arange(n_per_j[0])+ps_cursor)
-    exponents   = pseudo['exponents'][order]
-    prefactors  = pseudo['prefactors'][order]
-    r_exps      = pseudo['r_exps'][order]
+    order = list(np.arange(n_per_j[0],sum(n_per_j)-1)) + \
+            list(np.arange(n_per_j[0])) 
+    print("order",order)
+    exponents   = pseudo[elem]['exponents'][order]
+    prefactors  = pseudo[elem]['prefactors'][order]
+    r_exps      = pseudo[elem]['r_exps'][order]
     if numL > 2: aip = 12
     else:        aip =  6
     npjline = n_per_j[1:].tolist()+[n_per_j[0]]
@@ -515,16 +536,14 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
         "      "+' '.join(["{}" for i in range(numL)]).format(*npjline)
       ]
     cnt = 0
-    for jidx,j in enumerate(n_per_j):
-      for eidx in range(j):
-        outlines.append("      {:d}   {:<12} {:< 12}".format(
-          r_exps[cnt]+2,
-          float(exponents[cnt]),
-          float(prefactors[cnt])
-        ))
-        cnt += 1
+    for eidx in range(len(exponents)):
+      outlines.append("      {:d}   {:<12} {:< 12}".format(
+        r_exps[cnt]+2,
+        float(exponents[cnt]),
+        float(prefactors[cnt])
+      ))
+      cnt += 1
     outlines += ["    }","  }","}"]
-    ps_cursor += sum(n_per_j)
   with open(kbase+".sys",'w') as outf:
     outf.write("\n".join(outlines))
   return None
@@ -665,12 +684,15 @@ def write_moanalysis():
 
 ###############################################################################
 # Begin actual execution.
-def convert_crystal(base="qwalk",kfmt='old'):
+def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='old'):
   info, lat_parm, ions, basis, pseudo = read_gred()
+  for key in pseudo.keys():
+    print(key)
+    print(pseudo[key]['exponents'])
   eigsys = read_kred(info,basis)
 
   if eigsys['nspin'] > 1:
-    eigsys['totspin'] = read_outputfile("prop.in.o")
+    eigsys['totspin'] = read_outputfile(propoutfn)
   else:
     eigsys['totspin'] = 0
 
