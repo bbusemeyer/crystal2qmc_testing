@@ -46,12 +46,12 @@ def read_gred():
   lat_parm['struct_dim'] = int(info[9])
 
   # Lattice parameters.
-  lat_parm['prim_cell'] = \
+  lat_parm['latvecs'] = \
       np.array([float(w) for w in gred_words[cursor:cursor+9]]).reshape(3,3).T
   cursor += 9
   prim_trans= np.array(gred_words[cursor:cursor+9],dtype=float).reshape(3,3)
   cursor += 9
-  lat_parm['conv_cell'] = prim_trans.dot(lat_parm['prim_cell'])
+  lat_parm['conv_cell'] = prim_trans.dot(lat_parm['latvecs'])
   cursor += info[1] + 48*48 + 9*info[1] + 3*info[1] # Skip symmetry part.
 
   # Lattice "stars" (?) skipped.
@@ -299,16 +299,16 @@ def read_outputfile(fname = "prop.in.o"):
 ###############################################################################
 def find_basis_cutoff(lat_parm):
   if lat_parm['struct_dim'] > 0:
-    latvec = lat_parm['prim_cell']
+    latvecs = lat_parm['latvecs']
     cutoff_divider = 2.000001
-    cross01 = np.cross(latvec[0], latvec[1])
-    cross12 = np.cross(latvec[1], latvec[2])
-    cross02 = np.cross(latvec[0], latvec[2])
+    cross01 = np.cross(latvecs[0], latvecs[1])
+    cross12 = np.cross(latvecs[1], latvecs[2])
+    cross02 = np.cross(latvecs[0], latvecs[2])
 
     heights = [0,0,0]
-    heights[0]=abs(np.dot(latvec[0], cross12)/np.dot(cross12,cross12)**.5)
-    heights[1]=abs(np.dot(latvec[1], cross02)/np.dot(cross02,cross02)**.5)
-    heights[2]=abs(np.dot(latvec[2], cross01)/np.dot(cross01,cross01)**.5)
+    heights[0]=abs(np.dot(latvecs[0], cross12)/np.dot(cross12,cross12)**.5)
+    heights[1]=abs(np.dot(latvecs[1], cross02)/np.dot(cross02,cross02)**.5)
+    heights[2]=abs(np.dot(latvecs[2], cross01)/np.dot(cross01,cross01)**.5)
     return min(heights)/cutoff_divider
   else:
     return 7.5
@@ -470,7 +470,7 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
         "  latticevec {",
       ]
     for i in range(3):
-      outlines.append("    {:< 15} {:< 15} {:< 15}".format(*lat_parm['prim_cell'][i]))
+      outlines.append("    {:< 15} {:< 15} {:< 15}".format(*lat_parm['latvecs'][i]))
     outlines += [
         "  }",
         "  origin { 0 0 0 }",
