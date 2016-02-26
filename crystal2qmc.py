@@ -202,6 +202,8 @@ def read_kred(info,basis):
   cursor += nevals
   # Weights of eigenvales--incorperating Fermi energy cutoff.
   eig_weights = np.array(kred_words[cursor:cursor+nevals],dtype=float)
+  print("eigweights shape",eig_weights.shape)
+  print("eigweights sum",eig_weights.sum())
   cursor += nevals
 
   # Read in eigenvectors at inequivilent kpoints. Can't do all kpoints because we 
@@ -283,7 +285,7 @@ def read_kred(info,basis):
 
 ###############################################################################
 # Reads total spin from output file. 
-# TODO Is there a way around this?
+# TODO Is there a way around this? Yes.
 # Alternatively, this can read the CRYSTAL output file and still works!
 def read_outputfile(fname = "prop.in.o"):
   fin = open(fname,'r')
@@ -314,8 +316,8 @@ def find_basis_cutoff(lat_parm):
     return 7.5
 
 ###############################################################################
-def write_slater(basis,eigsys,kpt,base="qwalk",kfmt='new'):
-  if kfmt == 'old': kbase = base + '_' + "{}".format(eigsys['kpt_index'][kpt])
+def write_slater(basis,eigsys,kpt,base="qwalk",kfmt='coord'):
+  if kfmt == 'int': kbase = base + '_' + "{}".format(eigsys['kpt_index'][kpt])
   else:             kbase = base + '_' + "{}{}{}".format(*kpt)
   ntot = basis['ntot']
   nmo  = basis['nmo']
@@ -410,8 +412,8 @@ def normalize_eigvec(eigsys,basis,kpt):
       
 ###############################################################################
 # This assumes you have called normalize_eigvec first! TODO better coding style?
-def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='new'):
-  if kfmt == 'old':
+def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='coord'):
+  if kfmt == 'int':
     outf = open(base + '_' + "{}".format(eigsys['kpt_index'][kpt]) + ".orb",'w')
   else:
     outf = open(base + '_' + "{}{}{}".format(*kpt) + ".orb",'w')
@@ -455,13 +457,13 @@ def write_orb(eigsys,basis,ions,kpt,base="qwalk",kfmt='new'):
 
 ###############################################################################
 # TODO Generalize to no pseudopotential.
-def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
+def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='coord'):
   outlines = []
   min_exp = min(basis['prim_gaus'])
   cutoff_length = (-np.log(1e-8)/min_exp)**.5
   basis_cutoff = find_basis_cutoff(lat_parm)
   cutoff_divider = basis_cutoff*2.0 / cutoff_length
-  if kfmt == 'old': kbase = base + '_' + "{}".format(eigsys['kpt_index'][kpt])
+  if kfmt == 'int': kbase = base + '_' + "{}".format(eigsys['kpt_index'][kpt])
   else:             kbase = base + '_' + "{}{}{}".format(*kpt)
   if lat_parm['struct_dim'] != 0:
     outlines += [
@@ -539,7 +541,6 @@ def write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base="qwalk",kfmt='new'):
   return None
 
 ###############################################################################
-# TODO check generality of numbers.
 def write_jast2(lat_parm,ions,base="qwalk"):
   basis_cutoff = find_basis_cutoff(lat_parm)
   atom_types = [periodic_table[eidx-200-1] for eidx in ions['atom_nums']]
@@ -674,7 +675,16 @@ def write_moanalysis():
 
 ###############################################################################
 # Begin actual execution.
-def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='old'):
+# TODO test kfmt fallback.
+def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='coord'):
+  """
+  Files are named by [base]_[kfmt option].sys etc.
+  kfmt either 'int' or 'coord'.
+  kfmt = 'int' interates up from zero to name kpoints.
+  kfmt = 'coord' uses integer coordinate of kpoint and is more readable, but
+    doesn't work for SHRINK > 10 because it assumes one-digit coordinates.
+    kfmt will fall back on 'int' if it find this problem.
+  """
   info, lat_parm, ions, basis, pseudo = read_gred()
   eigsys = read_kred(info,basis)
 
@@ -688,7 +698,12 @@ def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='old'):
   basis['nmo']  = sum(basis['nao_shell']) # = nao
   eigsys['nup'] = int(round(0.5 * (basis['ntot'] + eigsys['totspin'])))
   eigsys['ndn'] = int(round(0.5 * (basis['ntot'] - eigsys['totspin'])))
-  
+
+  if (np.array(eigsys['kpt_coords']) >= 10).any():
+    print("Cannot use coord kpoint format when SHRINK > 10.")
+    print("Falling back on int format (old style).")
+    kfmt = 'int'
+ 
   for kpt in eigsys['kpt_coords']:
     write_slater(basis,eigsys,kpt,base,kfmt)
     normalize_eigvec(eigsys,basis,kpt)
@@ -696,6 +711,8 @@ def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='old'):
     write_sys(lat_parm,basis,eigsys,pseudo,ions,kpt,base,kfmt)
     write_basis(basis,ions,base)
     write_jast2(lat_parm,ions,base)
+
+  return eigsys['kpt_weights'] # Useful for autogen.
 
 if __name__ == "__main__":
   if len(sys.argv) > 1:
@@ -709,6 +726,6 @@ if __name__ == "__main__":
   if len(sys.argv) > 3:
     kfmt = sys.argv[3]
   else:
-    kfmt="new"
+    kfmt="coord"
   print("Converting crystal with base {}, system spin drawn from {}, and using {} kpoint naming convention".format(base,propoutfn,kfmt))
   convert_crystal(base,propoutfn,kfmt)
