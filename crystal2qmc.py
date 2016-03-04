@@ -47,7 +47,12 @@ def read_gred():
 
   # Lattice parameters.
   lat_parm['latvecs'] = \
-      np.array([float(w) for w in gred_words[cursor:cursor+9]]).reshape(3,3).T
+      np.array(gred_words[cursor:cursor+9],dtype=float).reshape(3,3).T.round(15)
+  if (lat_parm['latvecs'] > 100).any():
+    print("Lattice parameter larger than 100 A! Reducing to 100.")
+    print("If this is a dimension < 3 system, there is no cause for alarm.")
+    print("Otherwise if this is a problem for you, please generalize crystal2qmc.")
+    latparm['latvecs'][lat_parm['latvecs']>100] = 100.
   cursor += 9
   prim_trans= np.array(gred_words[cursor:cursor+9],dtype=float).reshape(3,3)
   cursor += 9
@@ -158,6 +163,15 @@ def read_gred():
       pseudo[atom]['n_per_j'] = n_per_j[npjlen*psidx:npjlen*(psidx+1)]
       pseudo[atom]['exponents'] = exponents[start:end]
 
+  ## Density matrix information.
+  # This is impossible to figure out.  See `cryapi_inp.f`.
+  #atomic_charges = np.array(gred_words[cursor:cursor+natoms],dtype=float)
+  #cursor += natoms
+  #mvlaf = info[55] #???
+  ## Skip symmetry information.
+  #cursor += mvlaf*4 + info[19]*info[1] + 
+  #print("atomic_charges",atomic_charges)
+
   return info, lat_parm, ions, basis, pseudo
 
 ###############################################################################
@@ -201,18 +215,19 @@ def read_kred(info,basis):
   eigsys['eigvals'] = np.array(kred_words[cursor:cursor+nevals],dtype=float)
   cursor += nevals
   # Weights of eigenvales--incorperating Fermi energy cutoff.
-  eig_weights = np.array(kred_words[cursor:cursor+nevals],dtype=float)
-  print("eigweights shape",eig_weights.shape)
-  print("eigweights sum",eig_weights.sum())
+  nbands = int(round(nevals / nikpts / eigsys['nspin']))
+  eig_weights = np.array(kred_words[cursor:cursor+nevals],dtype=float)\
+      .reshape(nikpts,eigsys['nspin'],nbands)\
+      .swapaxes(0,1)
   cursor += nevals
 
   # Read in eigenvectors at inequivilent kpoints. Can't do all kpoints because we 
   # don't know if non-inequivilent kpoints are real or complex (without symmetry
   # info)
-  nevals_kpt = int(round(nevals / nikpts / eigsys['nspin']))
+  nbands = int(round(nevals / nikpts / eigsys['nspin']))
   nkpts  = np.prod(eigsys['nkpts_dir'])
   nao = sum(basis['nao_shell'])
-  ncpnts = int(nevals_kpt * nao)
+  ncpnts = int(nbands * nao)
   kpt_coords   = []
   # Format: eigvecs[kpoint][<real/imag>][<spin up/spin down>]
   eigvecs = {}
