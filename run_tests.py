@@ -339,7 +339,7 @@ if checking_this:
 
 ##############################################
 # Graphene (2-d system)
-checking_this = False
+checking_this = True
 base = baseroot + "graphene_"
 element_list = [
     QWalkRunVMC(

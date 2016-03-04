@@ -52,7 +52,7 @@ def read_gred():
     print("Lattice parameter larger than 100 A! Reducing to 100.")
     print("If this is a dimension < 3 system, there is no cause for alarm.")
     print("Otherwise if this is a problem for you, please generalize crystal2qmc.")
-    latparm['latvecs'][lat_parm['latvecs']>100] = 100.
+    lat_parm['latvecs'][lat_parm['latvecs']>100] = 100.
   cursor += 9
   prim_trans= np.array(gred_words[cursor:cursor+9],dtype=float).reshape(3,3)
   cursor += 9
