@@ -95,7 +95,7 @@ cur_job['dft']['kmesh']=[3,3,3] # ensures one complex.
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
 if checking_this:
-  results.append(jc.execute(ref_job,element_list[:3]))
+  results.append(jc.execute(ref_job,element_list))
 
 element_list[2] = \
     NewRunProperties(
@@ -107,7 +107,7 @@ test_job = deepcopy(cur_job)
 test_job['control']['id'] = base+"test"
 test_job['dft']['restart_from'] = "../"+base+"ref"+"/fort.79"
 if checking_this:
-  results.append(jc.execute(test_job,element_list[:3]))
+  results.append(jc.execute(test_job,element_list))
 
 ##############################################
 # GaAs calculation (two different atoms).
@@ -339,7 +339,7 @@ if checking_this:
 
 ##############################################
 # Graphene (2-d system)
-checking_this = True
+checking_this = False
 base = baseroot + "graphene_"
 element_list = [
     QWalkRunVMC(
