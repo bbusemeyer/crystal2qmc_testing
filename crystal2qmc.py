@@ -691,7 +691,11 @@ def write_moanalysis():
 ###############################################################################
 # Begin actual execution.
 # TODO test kfmt fallback.
-def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='coord'):
+def convert_crystal(
+    base="qwalk",
+    propoutfn="prop.in.o",
+    kfmt='coord',
+    kset='complex'):
   """
   Files are named by [base]_[kfmt option].sys etc.
   kfmt either 'int' or 'coord'.
@@ -720,6 +724,7 @@ def convert_crystal(base="qwalk",propoutfn="prop.in.o",kfmt='coord'):
     kfmt = 'int'
  
   for kpt in eigsys['kpt_coords']:
+    if eigsys['ikpt_iscmpx'][kpt] and kset=='real': continue
     write_slater(basis,eigsys,kpt,base,kfmt)
     normalize_eigvec(eigsys,basis,kpt)
     write_orb(eigsys,basis,ions,kpt,base,kfmt)
@@ -742,5 +747,12 @@ if __name__ == "__main__":
     kfmt = sys.argv[3]
   else:
     kfmt="coord"
-  print("Converting crystal with base {}, system spin drawn from {}, and using {} kpoint naming convention".format(base,propoutfn,kfmt))
-  convert_crystal(base,propoutfn,kfmt)
+  if len(sys.argv) > 4:
+    kset = sys.argv[4]
+  else:
+    kset="complex"
+  print("Converting crystal with base {},".format(base))
+  print("system spin drawn from {},".format(propoutfn))
+  print("using {} kpoint naming convention,".format(kfmt))
+  print("and using {} kpoint set.".format(kset))
+  convert_crystal(base,propoutfn,kfmt,kset)
