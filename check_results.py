@@ -1,5 +1,7 @@
 from __future__ import print_function
 import pandas as pd
+import json
+import process_record as pr
 import data_processing as dp
 
 def process_ids(idstr):
@@ -32,11 +34,14 @@ def compare_results(df,tol=3.0):
   return pd.Series([kcheck,allcheck,avgcheck],['kcheck','allcheck','avgcheck'])
 
 def perform_check(inpjson="test_results.json"):
-  rawdf,alldf = dp.format_autogen(inpjson)
+  alldf = pd.DataFrame(json.load(open(inpjson,'r')))
+  alldf = alldf.join(pr.unpack(alldf['control']))
   alldf = alldf.join(alldf['id'].apply(process_ids))
-  alldf = dp.kavergage_qmc(alldf,qmc_type='vmc')
-  alldf['results'] = alldf.loc[alldf['results'].notnull(),'results']\
-      .apply(dp.format_results)
+  for key in ['energy']:
+    alldf = alldf.join(
+        pr.unpack(pr.unpack(alldf['vmc'])[key]).applymap(dp.undict)
+      )
+  return alldf
   checkdf = alldf[alldf['results'].notnull()]\
       .groupby('material')\
       .apply(compare_results)

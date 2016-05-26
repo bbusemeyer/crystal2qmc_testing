@@ -2,9 +2,6 @@ from __future__ import division,print_function
 import numpy as np
 import sys
 
-# Number of types of pseudopotentials.
-NPS_TYPES = 6
-
 def error(message,errortype):
   print(message)
   exit(errortype)
@@ -195,7 +192,7 @@ def read_kred(info,basis):
   cursor += 9
   # Inequivilent k-point coord in reciprocal basis.
   ikpt_coords = np.array(kred_words[cursor:cursor+3*nikpts],int)
-  ikpt_coords = map(tuple,ikpt_coords.reshape(nikpts,3))
+  ikpt_coords = list(map(tuple,ikpt_coords.reshape(nikpts,3)))
   # Useful to compare to old output format.
   eigsys['kpt_index'] = dict(zip(ikpt_coords,range(len(ikpt_coords))))
   cursor += 3*nikpts
@@ -216,9 +213,8 @@ def read_kred(info,basis):
   cursor += nevals
   # Weights of eigenvales--incorperating Fermi energy cutoff.
   nbands = int(round(nevals / nikpts / eigsys['nspin']))
-  eig_weights = np.array(kred_words[cursor:cursor+nevals],dtype=float)\
-      .reshape(nikpts,eigsys['nspin'],nbands)\
-      .swapaxes(0,1)
+  eigsys['eig_weights'] = np.array(kred_words[cursor:cursor+nevals],dtype=float)\
+      .reshape(nikpts,eigsys['nspin'],nbands)
   cursor += nevals
 
   # Read in eigenvectors at inequivilent kpoints. Can't do all kpoints because we 
@@ -732,7 +728,7 @@ def convert_crystal(
     write_basis(basis,ions,base)
     write_jast2(lat_parm,ions,base)
 
-  return eigsys['kpt_weights'] # Useful for autogen.
+  return info,lat_parm,ions,basis,pseudo,eigsys
 
 if __name__ == "__main__":
   if len(sys.argv) > 1:
