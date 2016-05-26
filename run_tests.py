@@ -6,9 +6,10 @@ from runqwalk import Crystal2QWalk, NewCrystal2QWalk,\
                      QWalkVarianceOptimize, QWalkRunVMC
 from copy import deepcopy
 import job_control as jc
+import process_record as pr
 import os
 import json
-import check_results
+#import check_results
 
 import veritas as ver
 
@@ -22,10 +23,10 @@ default_job['dft']['tolinteg']=[6,6,6,6,14]
 default_job['dft']['edifftol'] = 6
 default_job['dft']['kmesh']=[4,4,4]
 default_job['dft']['spin_polarized']=False
-default_job['qmc']['vmc']['optimizer'] = None
+default_job['qmc']['vmc']['optimizer'] = ['none']
 default_job['qmc']['vmc']['nblock'] = 100
 default_job['qmc']['vmc']['target_error'] = 0.01
-default_job['qmc']['kpoints']='complex'
+default_job['qmc']['kpoints']='all'
 
 ##############################################
 # Simple Si calculation.
@@ -95,8 +96,7 @@ cur_job['dft']['kmesh']=[3,3,3] # ensures one complex.
 ref_job = deepcopy(cur_job)
 ref_job['control']['id'] = base+"ref"
 if checking_this:
-  results.append(jc.execute(ref_job,element_list))
-
+  results.append(jc.execute(ref_job,element_list)) 
 element_list[2] = \
     NewRunProperties(
       submitter=ver.LocalVeritasPropertiesSubmitter(
@@ -316,6 +316,7 @@ element_list = [
         nn=1,np=8,time="20:00:00",queue="batch"))
   ]
 
+cur_job = deepcopy(default_job)
 del cur_job['cif']
 cur_job['xyz'] = open("CO.xyz",'r').read()
 cur_job['qmc']['vmc']['target_error'] = 0.005
@@ -361,14 +362,17 @@ if checking_this:
 
 ###############################################
 # Gather and export.
-json.dump(results,open("test_results.json",'w'))
+data = []
+for result in results:
+  data.append(pr.process_record(result))
+json.dump(data,open("test_results.json",'w'))
 
-print("~~~~~~~~~~~~~~~~~~~~~~")
-print("Checking results...")
-try:
-  check_results.perform_check("test_results.json")
-except KeyError:
-  print("KeyError occured, maybe no calculations have finished yet?")
-except IndexError:
-  print("IndexError occured, maybe only one type of calculation has finished yet?")
-print("======================")
+#print("~~~~~~~~~~~~~~~~~~~~~~")
+#print("Checking results...")
+#try:
+#  check_results.perform_check("test_results.json")
+#except KeyError:
+#  print("KeyError occured, maybe no calculations have finished yet?")
+#except IndexError:
+#  print("IndexError occured, maybe only one type of calculation has finished yet?")
+#print("======================")

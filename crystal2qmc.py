@@ -728,7 +728,7 @@ def convert_crystal(
     write_basis(basis,ions,base)
     write_jast2(lat_parm,ions,base)
 
-  return eigsys['kpt_weights'] # Useful for autogen.
+  return info,lat_parm,ions,basis,pseudo,eigsys
 
 if __name__ == "__main__":
   if len(sys.argv) > 1:
